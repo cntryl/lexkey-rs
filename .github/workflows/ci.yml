@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Format
+        run: cargo fmt -- --check
+
+      - name: Check Syntax
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build
+        run: cargo build
+
+      - name: Test
+        run: cargo test --all
