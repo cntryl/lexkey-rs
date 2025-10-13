@@ -10,7 +10,7 @@ permissions:
   actions: write
 
 jobs:
-  build:
+  cleanup:
     name: Workflow Cleanup
     runs-on: ubuntu-latest
     timeout-minutes: 5
