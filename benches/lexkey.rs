@@ -34,7 +34,7 @@ fn bench_encode_i64_into(c: &mut Criterion) {
 fn bench_encode_f64(c: &mut Criterion) {
     c.bench_function("encode_f64", |b| {
         b.iter(|| {
-            let k = LexKey::encode_f64(black_box(3.141592653589793));
+            let k = LexKey::encode_f64(black_box(std::f64::consts::PI));
             black_box(k);
         })
     });
@@ -44,7 +44,7 @@ fn bench_encode_f64_into(c: &mut Criterion) {
     c.bench_function("encode_f64_into", |b| {
         b.iter(|| {
             let mut buf = Vec::with_capacity(8);
-            let n = LexKey::encode_f64_into(&mut buf, black_box(3.141592653589793));
+            let n = LexKey::encode_f64_into(&mut buf, black_box(std::f64::consts::PI));
             black_box((buf, n));
         })
     });
@@ -89,7 +89,7 @@ fn bench_encode_f64_into_reuse(c: &mut Criterion) {
         let mut buf = Vec::with_capacity(8);
         b.iter(|| {
             buf.clear();
-            let n = LexKey::encode_f64_into(&mut buf, black_box(3.141592653589793));
+            let n = LexKey::encode_f64_into(&mut buf, black_box(std::f64::consts::PI));
             black_box((&buf, n));
         })
     });

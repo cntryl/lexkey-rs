@@ -71,7 +71,7 @@ fn bench_encoder_f64_new(c: &mut Criterion) {
     c.bench_function("encoder_f64_new", |b| {
         b.iter(|| {
             let mut enc = Encoder::with_capacity(8);
-            let n = enc.encode_f64_into(black_box(3.141592653589793));
+            let n = enc.encode_f64_into(black_box(std::f64::consts::PI));
             black_box((enc, n));
         })
     });
@@ -82,7 +82,7 @@ fn bench_encoder_f64_reuse(c: &mut Criterion) {
         let mut enc = Encoder::with_capacity(8);
         b.iter(|| {
             enc.clear();
-            let n = enc.encode_f64_into(black_box(3.141592653589793));
+            let n = enc.encode_f64_into(black_box(std::f64::consts::PI));
             black_box((enc.as_slice(), n));
         })
     });
