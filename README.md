@@ -1,5 +1,10 @@
 # lexkey-rs
 
+[![Crates.io](https://img.shields.io/crates/v/cntryl-lexkey.svg)](https://crates.io/crates/cntryl-lexkey)
+[![Documentation](https://docs.rs/cntryl-lexkey/badge.svg)](https://docs.rs/cntryl-lexkey)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build Status](https://github.com/cntryl/lexkey-rs/workflows/CI/badge.svg)](https://github.com/cntryl/lexkey-rs/actions)
+
 Lexicographically sortable byte keys for numbers, strings, UUIDs, and composites.
 
 This crate offers two complementary APIs:
@@ -23,8 +28,24 @@ assert!(comp.as_bytes().windows(1).any(|w| w == [0x00]));
 
 ## Examples
 
-See `examples/encode_demo.rs` for a small demo showing how to build composite keys and a recommended
-pattern for encoding optional values (presence marker).
+Run the examples to see common patterns:
+
+```bash
+# Build composite keys with optional values (presence markers)
+cargo run --example encode_demo
+
+# Range query bounds using encode_first/encode_last
+cargo run --example range_queries
+
+# Zero-allocation hot path with Encoder reuse
+cargo run --example hot_path
+```
+
+See the `examples/` directory for detailed code demonstrating:
+- Composite key construction
+- Optional value encoding patterns
+- Prefix-based range queries
+- High-performance buffer reuse
 
 // Zero-allocation hot path using Encoder reuse
 enc.encode_string_into("tenant");

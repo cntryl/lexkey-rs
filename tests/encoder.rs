@@ -45,7 +45,7 @@ fn encoder_encode_f64_returns_eight() {
     let mut enc = Encoder::with_capacity(64);
 
     // Act
-    let n = enc.encode_f64_into(3.14);
+    let n = enc.encode_f64_into(std::f64::consts::PI);
 
     // Assert
     assert_eq!(n, 8);
@@ -113,7 +113,7 @@ fn lexkey_clear_and_reuse_vec_for_encoding() {
 
     // Act (clear and reuse)
     buf.clear();
-    let second = LexKey::encode_f64_into(&mut buf, 2.71828);
+    let second = LexKey::encode_f64_into(&mut buf, std::f64::consts::E);
 
     // Assert
     assert_eq!(second, 8);

@@ -63,8 +63,8 @@ fn should_encode_bool_nil_and_end_marker_as_single_bytes() {
 #[test]
 fn should_transform_floats_and_map_nan_to_canonical() {
     // Arrange
-    let p = LexKey::encode_f64(3.14_f64);
-    let n = LexKey::encode_f64(-3.14_f64);
+    let p = LexKey::encode_f64(std::f64::consts::PI);
+    let n = LexKey::encode_f64(-std::f64::consts::PI);
 
     // Act/Assert: ordering
     assert!(n < p);
@@ -199,7 +199,7 @@ fn should_order_infinities_correctly() {
 #[test]
 fn should_widen_float32_to_float64_before_encoding() {
     // Arrange: pick a float32 value
-    let v32: f32 = 3.1415927_f32;
+    let v32: f32 = std::f32::consts::PI;
     let widened = v32 as f64;
 
     // Act
@@ -246,8 +246,8 @@ fn should_compare_using_ord_and_partialord() {
 
     // Act/Assert: PartialOrd/Ord
     assert!(a < b);
-    assert_eq!(a.cmp(&b).is_lt(), true);
-    assert_eq!(b.cmp(&a).is_gt(), true);
+    assert!(a.cmp(&b).is_lt());
+    assert!(b.cmp(&a).is_gt());
 }
 
 #[test]
@@ -283,7 +283,7 @@ fn should_write_into_buffer_for_various_types() {
     // Act
     let n_written_i = LexKey::encode_i64_into(&mut buf, -123i64);
     let n_written_u = LexKey::encode_u64_into(&mut buf, 123u64);
-    let n_written_f = LexKey::encode_f64_into(&mut buf, 3.14f64);
+    let n_written_f = LexKey::encode_f64_into(&mut buf, std::f64::consts::PI);
     let n_written_b = LexKey::encode_bool_into(&mut buf, true);
 
     // Assert: lengths
