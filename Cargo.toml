@@ -8,6 +8,7 @@ description = "Lexicographically-sortable binary key encodings for numbers, stri
 repository = "https://github.com/cntryl/lexkey-rs"
 homepage = "https://github.com/cntryl/lexkey-rs"
 keywords = ["lexicographic", "encoding", "keys", "uuid", "sortable"]
+categories = ["encoding", "database"]
 [lib]
 name = "lexkey"
 path = "src/lib.rs"
