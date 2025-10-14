@@ -29,7 +29,10 @@ fn main() {
 
     println!("Encoded {} composite keys", iterations);
     println!("Total time: {:?}", duration);
-    println!("Average: {:.2} ns/key", duration.as_nanos() as f64 / iterations as f64);
+    println!(
+        "Average: {:.2} ns/key",
+        duration.as_nanos() as f64 / iterations as f64
+    );
     println!();
     println!("Key reuse eliminates allocation overhead in tight loops.");
 }
