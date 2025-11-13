@@ -1,4 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+mod common;
+use common::bench_config;
 use lexkey::{Encoder, LexKey};
 use uuid::Uuid;
 
@@ -153,19 +155,21 @@ fn bench_encoder_composite_reuse(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    encoder_benches,
-    bench_encoder_string_new,
-    bench_encoder_string_reuse,
-    bench_encoder_u64_new,
-    bench_encoder_u64_reuse,
-    bench_encoder_i64_new,
-    bench_encoder_i64_reuse,
-    bench_encoder_f64_new,
-    bench_encoder_f64_reuse,
-    bench_encoder_uuid_new,
-    bench_encoder_uuid_reuse,
-    bench_encoder_composite_new,
-    bench_encoder_composite_reuse,
-);
+criterion_group! {
+    name = encoder_benches;
+    config = bench_config();
+    targets =
+        bench_encoder_string_new,
+        bench_encoder_string_reuse,
+        bench_encoder_u64_new,
+        bench_encoder_u64_reuse,
+        bench_encoder_i64_new,
+        bench_encoder_i64_reuse,
+        bench_encoder_f64_new,
+        bench_encoder_f64_reuse,
+        bench_encoder_uuid_new,
+        bench_encoder_uuid_reuse,
+        bench_encoder_composite_new,
+        bench_encoder_composite_reuse,
+}
 criterion_main!(encoder_benches);

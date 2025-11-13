@@ -1,4 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+mod common;
+use common::bench_config;
 use lexkey::LexKey;
 use uuid::Uuid;
 
@@ -138,19 +140,21 @@ fn bench_composite_scaling(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_encode_string,
-    bench_encode_i64,
-    bench_encode_i64_into,
-    bench_encode_f64,
-    bench_encode_f64_into,
-    bench_encode_composite,
-    bench_encode_composite_into,
-    bench_encode_i64_into_reuse,
-    bench_encode_f64_into_reuse,
-    bench_encode_composite_into_reuse,
-    bench_composite_scaling
-);
+criterion_group! {
+    name = benches;
+    config = bench_config();
+    targets =
+        bench_encode_string,
+        bench_encode_i64,
+        bench_encode_i64_into,
+        bench_encode_f64,
+        bench_encode_f64_into,
+        bench_encode_composite,
+        bench_encode_composite_into,
+        bench_encode_i64_into_reuse,
+        bench_encode_f64_into_reuse,
+        bench_encode_composite_into_reuse,
+        bench_composite_scaling,
+}
 
 criterion_main!(benches);

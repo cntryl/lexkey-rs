@@ -30,7 +30,7 @@ impl Encoder {
         self.buf.clear();
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_bytes(&mut self, src: &[u8]) -> usize {
         let len = src.len();
         if len == 0 {
@@ -57,9 +57,8 @@ impl Encoder {
     }
 
     /// Append a single byte.
-    #[inline]
+    #[inline(always)]
     pub fn push_byte(&mut self, b: u8) {
-        self.buf.reserve(1);
         self.buf.put_u8(b);
     }
 
@@ -94,19 +93,16 @@ impl Encoder {
     /// - Positive floats: flip the sign bit
     ///
     /// NaN is rejected because it breaks total ordering.
-    #[inline]
+    #[inline(always)]
     pub fn encode_f64_into(&mut self, x: f64) -> usize {
         if x.is_nan() {
             panic!("NaN is not encodable in lexkeys");
         }
-
-        let bits = x.to_bits();
-        let enc = if bits >> 63 == 1 {
-            !bits // negative
-        } else {
-            bits ^ 0x8000_0000_0000_0000 // positive
-        };
-
+        let b = x.to_bits();
+        let mask = ((b as i64) >> 63) as u64; // all 1s for negative, 0 for positive
+        let neg = !b;
+        let pos = b ^ 0x8000_0000_0000_0000u64;
+        let enc = (neg & mask) | (pos & !mask);
         self.buf.put_u64(enc);
         8
     }
@@ -121,6 +117,7 @@ impl Encoder {
     ///
     /// Parts must not contain interior null bytes. Empty parts are allowed but
     /// never produce double separators. No trailing separator is written.
+    #[inline(always)]
     pub fn encode_composite_into_buf(&mut self, parts: &[&[u8]]) -> usize {
         if parts.is_empty() {
             return 0;
@@ -134,17 +131,21 @@ impl Encoder {
 
         let mut written = 0usize;
 
-        for (i, part) in parts.iter().enumerate() {
+        // Write all parts except the last, adding separators between them
+        for part in &parts[..parts.len() - 1] {
             if !part.is_empty() {
                 self.buf.put_slice(part);
                 written += part.len();
             }
+            self.buf.put_u8(0x00);
+            written += 1;
+        }
 
-            // Add separator only between parts
-            if i + 1 < parts.len() {
-                self.buf.put_u8(0x00);
-                written += 1;
-            }
+        // Write the last part without trailing separator
+        let last = parts.last().unwrap();
+        if !last.is_empty() {
+            self.buf.put_slice(last);
+            written += last.len();
         }
 
         written
