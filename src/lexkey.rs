@@ -6,6 +6,8 @@ use uuid::Uuid;
 // encodings (false/true/end-marker). Using `Bytes::from_static` avoids a heap
 // allocation for these hot small constructors.
 static END_MARKER_BYTE: [u8; 1] = [0xFFu8];
+static BOOL_FALSE: [u8; 1] = [0x00u8];
+static BOOL_TRUE: [u8; 1] = [0x01u8];
 
 /// A lexicographically sortable key.
 ///
@@ -68,26 +70,15 @@ impl LexKey {
     /// let k = LexKey::encode_string("hello");
     /// assert_eq!(k.as_bytes(), b"hello");
     /// ```
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_string(s: &str) -> Self {
         Self::from_bytes(Bytes::copy_from_slice(s.as_bytes()))
     }
 
     /* -------------------------------------------------------
-     *  FIXED-WIDTH ENCODERS — optimized using BytesMut
+     *  FIXED-WIDTH ENCODERS — optimized using stack arrays
      * ----------------------------------------------------- */
-
-    #[inline]
-    fn encode_fixed<F>(cap: usize, f: F) -> Self
-    where
-        F: FnOnce(&mut BytesMut),
-    {
-        let mut buf = BytesMut::with_capacity(cap);
-        f(&mut buf);
-        Self {
-            bytes: buf.freeze(),
-        }
-    }
 
     /// Encode an unsigned integer as 8-byte big-endian.
     ///
@@ -95,9 +86,11 @@ impl LexKey {
     /// use lexkey::LexKey;
     /// assert_eq!(LexKey::encode_u64(123).to_hex_string(), "000000000000007b");
     /// ```
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_u64(n: u64) -> Self {
-        Self::encode_fixed(8, |b| b.put_u64(n))
+        let bytes = n.to_be_bytes();
+        Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
     /// Append the 8-byte big-endian encoding of `n` into `dst`.
@@ -111,10 +104,12 @@ impl LexKey {
     /// Encode a signed integer so that lexicographic order matches numeric order.
     ///
     /// Transform: `(n as u64) ^ 0x8000_0000_0000_0000`, then big-endian.
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_i64(n: i64) -> Self {
         let transformed = (n as u64) ^ 0x8000_0000_0000_0000u64;
-        Self::encode_fixed(8, |b| b.put_u64(transformed))
+        let bytes = transformed.to_be_bytes();
+        Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
     /// Append the transformed 8-byte encoding of an `i64` into `dst` (always 8 bytes).
@@ -126,9 +121,14 @@ impl LexKey {
     }
 
     /// Encode a boolean: `false -> 0x00`, `true -> 0x01`.
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_bool(b: bool) -> Self {
-        Self::encode_fixed(1, |s| s.put_u8(b as u8))
+        if b {
+            Self { bytes: Bytes::from_static(&BOOL_TRUE) }
+        } else {
+            Self { bytes: Bytes::from_static(&BOOL_FALSE) }
+        }
     }
 
     /// Append the boolean encoding into `dst` and return 1.
@@ -144,7 +144,8 @@ impl LexKey {
     /// optional/absent floating-point values if you need to express missingness.
     /// Negative values are bitwise-not of their IEEE representation; non-negative values are
     /// XOR'd with the sign bit.
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_f64(x: f64) -> Self {
         if x.is_nan() {
             panic!("NaN is not encodable");
@@ -160,7 +161,8 @@ impl LexKey {
         let pos = b ^ 0x8000_0000_0000_0000u64;
         let transformed = (neg & sign_mask) | (pos & !sign_mask);
 
-        Self::encode_fixed(8, |buf| buf.put_u64(transformed))
+        let bytes = transformed.to_be_bytes();
+        Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
     /// Append the transformed 8-byte encoding of an `f64` into `dst` (always 8 bytes).
@@ -181,9 +183,10 @@ impl LexKey {
     }
 
     /// Encode a UUID as its 16 raw RFC4122 bytes.
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_uuid(u: &Uuid) -> Self {
-        Self::encode_fixed(16, |b| b.extend_from_slice(u.as_bytes()))
+        Self::from_bytes(Bytes::copy_from_slice(u.as_bytes()))
     }
 
     /// Append a UUID’s 16 bytes into `dst` and return 16.
@@ -194,13 +197,15 @@ impl LexKey {
     }
 
     /// Encode a UTC timestamp represented as UNIX nanoseconds.
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_time_unix_nanos(nanos: i64) -> Self {
         Self::encode_i64(nanos)
     }
 
     /// Encode the end sentinel as a single `0xFF` byte.
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn encode_end_marker() -> Self {
         Self {
             bytes: Bytes::from_static(&END_MARKER_BYTE),
@@ -242,11 +247,12 @@ impl LexKey {
     pub fn encode_composite(parts: &[&[u8]]) -> Self {
         let cap = Self::composite_capacity(parts);
         let mut buf = BytesMut::with_capacity(cap);
-
-        let mut iter = parts.iter().peekable();
-        while let Some(p) = iter.next() {
-            buf.extend_from_slice(p);
-            if iter.peek().is_some() {
+        
+        for (i, &p) in parts.iter().enumerate() {
+            if !p.is_empty() {
+                buf.extend_from_slice(p);
+            }
+            if i + 1 < parts.len() {
                 buf.put_u8(Self::SEPARATOR);
             }
         }
@@ -258,12 +264,20 @@ impl LexKey {
 
     /// Append composite parts into `dst` without a trailing separator and return bytes written.
     pub fn encode_composite_into(dst: &mut Vec<u8>, parts: &[&[u8]]) -> usize {
-        let start = dst.len();
-        let mut iter = parts.iter().peekable();
+        if parts.is_empty() {
+            return 0;
+        }
 
-        while let Some(p) = iter.next() {
-            dst.extend_from_slice(p);
-            if iter.peek().is_some() {
+        let start = dst.len();
+        let additional = parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
+        dst.reserve(additional);
+
+        for (i, p) in parts.iter().enumerate() {
+            if !p.is_empty() {
+                dst.extend_from_slice(p);
+            }
+
+            if i + 1 < parts.len() {
                 dst.push(Self::SEPARATOR);
             }
         }

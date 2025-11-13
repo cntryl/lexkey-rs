@@ -33,12 +33,13 @@ impl Encoder {
     #[inline(always)]
     fn write_bytes(&mut self, src: &[u8]) -> usize {
         let len = src.len();
-        if len == 0 {
-            return 0;
-        }
-        self.buf.reserve(len);
-        self.buf.put_slice(src);
+        self.buf.extend_from_slice(src);
         len
+    }
+
+    #[inline(always)]
+    fn put_u64_be(&mut self, n: u64) {
+        self.buf.put_u64(n);
     }
 
     /// Convert the accumulated buffer into an immutable `Bytes`.
@@ -71,7 +72,7 @@ impl Encoder {
     /// Append the canonical 8-byte big-endian encoding of a `u64`.
     #[inline]
     pub fn encode_u64_into(&mut self, n: u64) -> usize {
-        self.buf.put_u64(n);
+        self.put_u64_be(n);
         8
     }
 
@@ -83,7 +84,7 @@ impl Encoder {
     #[inline]
     pub fn encode_i64_into(&mut self, n: i64) -> usize {
         let u = (n as u64) ^ 0x8000_0000_0000_0000;
-        self.buf.put_u64(u);
+        self.put_u64_be(u);
         8
     }
 
@@ -103,7 +104,7 @@ impl Encoder {
         let neg = !b;
         let pos = b ^ 0x8000_0000_0000_0000u64;
         let enc = (neg & mask) | (pos & !mask);
-        self.buf.put_u64(enc);
+        self.put_u64_be(enc);
         8
     }
 
@@ -123,29 +124,18 @@ impl Encoder {
             return 0;
         }
 
-        // Pre-reserve for predictable growth.
-        let total_len =
-            parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
-
-        self.buf.reserve(total_len);
-
         let mut written = 0usize;
-
-        // Write all parts except the last, adding separators between them
-        for part in &parts[..parts.len() - 1] {
+        
+        for (i, part) in parts.iter().enumerate() {
             if !part.is_empty() {
-                self.buf.put_slice(part);
+                self.buf.extend_from_slice(part);
                 written += part.len();
             }
-            self.buf.put_u8(0x00);
-            written += 1;
-        }
 
-        // Write the last part without trailing separator
-        let last = parts.last().unwrap();
-        if !last.is_empty() {
-            self.buf.put_slice(last);
-            written += last.len();
+            if i + 1 < parts.len() {
+                self.buf.put_u8(0x00);
+                written += 1;
+            }
         }
 
         written
