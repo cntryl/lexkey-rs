@@ -2,6 +2,8 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp::Ordering;
 use uuid::Uuid;
 
+const SIGN_BIT: u64 = 0x8000_0000_0000_0000;
+
 // Small static byte buffers used to avoid allocating tiny Vecs for common single-byte
 // encodings (false/true/end-marker). Using `Bytes::from_static` avoids a heap
 // allocation for these hot small constructors.
@@ -107,7 +109,7 @@ impl LexKey {
     #[inline(always)]
     #[must_use]
     pub fn encode_i64(n: i64) -> Self {
-        let transformed = (n as u64) ^ 0x8000_0000_0000_0000u64;
+        let transformed = (n as u64) ^ SIGN_BIT;
         let bytes = transformed.to_be_bytes();
         Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
@@ -115,7 +117,7 @@ impl LexKey {
     /// Append the transformed 8-byte encoding of an `i64` into `dst` (always 8 bytes).
     #[inline(always)]
     pub fn encode_i64_into(dst: &mut Vec<u8>, n: i64) -> usize {
-        let t = (n as u64) ^ 0x8000_0000_0000_0000u64;
+        let t = (n as u64) ^ SIGN_BIT;
         dst.extend_from_slice(&t.to_be_bytes());
         8
     }
@@ -158,7 +160,7 @@ impl LexKey {
         // negative → !b
         // positive → b ^ signbit
         let neg = !b;
-        let pos = b ^ 0x8000_0000_0000_0000u64;
+        let pos = b ^ SIGN_BIT;
         let transformed = (neg & sign_mask) | (pos & !sign_mask);
 
         let bytes = transformed.to_be_bytes();
@@ -175,7 +177,7 @@ impl LexKey {
         let b = x.to_bits();
         let mask = ((b as i64) >> 63) as u64;
         let neg = !b;
-        let pos = b ^ 0x8000_0000_0000_0000u64;
+        let pos = b ^ SIGN_BIT;
         let transformed = (neg & mask) | (pos & !mask);
 
         dst.extend_from_slice(&transformed.to_be_bytes());
