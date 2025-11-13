@@ -1,0 +1,62 @@
+# .gitattributes - canonical settings for lexkey-rs (Rust project)
+# Normalize text files to LF in the repository and mark common binaries
+
+# Use Git's automatic text detection but prefer LF for repository storage
+* text=auto eol=lf
+
+# Rust and project files - enforce LF
+*.rs text eol=lf
+*.toml text eol=lf
+Cargo.lock text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+
+# Shell scripts should use LF
+*.sh text eol=lf
+
+# PowerShell scripts on Windows keep CRLF by default for convenience
+*.ps1 text eol=crlf
+
+# Treat common binary/media/archive formats as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.lib binary
+*.a binary
+*.class binary
+*.jar binary
+*.wasm binary
+
+# Build artifacts and editor folders: avoid diffs for generated output
+/target/** binary
+/target/** export-ignore
+/.idea/** export-ignore
+/.vscode/** export-ignore
+
+# Don't include packaged crates in archives
+/*.crate export-ignore
+
+# Mark docs folder as documentation for GitHub linguist (optional)
+docs/** linguist-documentation
+
