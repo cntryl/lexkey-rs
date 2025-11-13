@@ -30,18 +30,6 @@ impl Encoder {
         self.buf.clear();
     }
 
-    #[inline(always)]
-    fn write_bytes(&mut self, src: &[u8]) -> usize {
-        let len = src.len();
-        self.buf.extend_from_slice(src);
-        len
-    }
-
-    #[inline(always)]
-    fn put_u64_be(&mut self, n: u64) {
-        self.buf.put_u64(n);
-    }
-
     /// Convert the accumulated buffer into an immutable `Bytes`.
     pub fn freeze(self) -> Bytes {
         self.buf.freeze()
@@ -66,13 +54,15 @@ impl Encoder {
     /// Append a UTF-8 string (raw bytes).
     #[inline]
     pub fn encode_string_into(&mut self, s: &str) -> usize {
-        self.write_bytes(s.as_bytes())
+        let bytes = s.as_bytes();
+        self.buf.extend_from_slice(bytes);
+        bytes.len()
     }
 
     /// Append the canonical 8-byte big-endian encoding of a `u64`.
-    #[inline]
+    #[inline(always)]
     pub fn encode_u64_into(&mut self, n: u64) -> usize {
-        self.put_u64_be(n);
+        self.buf.put_u64(n);
         8
     }
 
@@ -81,10 +71,10 @@ impl Encoder {
     /// Mapping preserves ordering:
     ///   i64::MIN → 0x00...
     ///   i64::MAX → 0xFF...
-    #[inline]
+    #[inline(always)]
     pub fn encode_i64_into(&mut self, n: i64) -> usize {
         let u = (n as u64) ^ 0x8000_0000_0000_0000;
-        self.put_u64_be(u);
+        self.buf.put_u64(u);
         8
     }
 
@@ -104,14 +94,15 @@ impl Encoder {
         let neg = !b;
         let pos = b ^ 0x8000_0000_0000_0000u64;
         let enc = (neg & mask) | (pos & !mask);
-        self.put_u64_be(enc);
+        self.buf.put_u64(enc);
         8
     }
 
     /// Append the 16-byte RFC-4122 UUID representation.
-    #[inline]
+    #[inline(always)]
     pub fn encode_uuid_into_buf(&mut self, u: &Uuid) -> usize {
-        self.write_bytes(u.as_bytes())
+        self.buf.extend_from_slice(u.as_bytes());
+        16
     }
 
     /// Append a composite multi-part key separated by `0x00`.
@@ -124,6 +115,8 @@ impl Encoder {
             return 0;
         }
 
+        let total = parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
+        self.buf.reserve(total);
         let mut written = 0usize;
         
         for (i, part) in parts.iter().enumerate() {

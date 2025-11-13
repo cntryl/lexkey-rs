@@ -95,7 +95,7 @@ impl LexKey {
 
     /// Append the 8-byte big-endian encoding of `n` into `dst`.
     /// Returns the number of bytes written (always 8).
-    #[inline]
+    #[inline(always)]
     pub fn encode_u64_into(dst: &mut Vec<u8>, n: u64) -> usize {
         dst.extend_from_slice(&n.to_be_bytes());
         8
@@ -113,7 +113,7 @@ impl LexKey {
     }
 
     /// Append the transformed 8-byte encoding of an `i64` into `dst` (always 8 bytes).
-    #[inline]
+    #[inline(always)]
     pub fn encode_i64_into(dst: &mut Vec<u8>, n: i64) -> usize {
         let t = (n as u64) ^ 0x8000_0000_0000_0000u64;
         dst.extend_from_slice(&t.to_be_bytes());
@@ -132,7 +132,7 @@ impl LexKey {
     }
 
     /// Append the boolean encoding into `dst` and return 1.
-    #[inline]
+    #[inline(always)]
     pub fn encode_bool_into(dst: &mut Vec<u8>, b: bool) -> usize {
         dst.push(if b { 0x01 } else { 0x00 });
         1
@@ -166,7 +166,7 @@ impl LexKey {
     }
 
     /// Append the transformed 8-byte encoding of an `f64` into `dst` (always 8 bytes).
-    #[inline]
+    #[inline(always)]
     pub fn encode_f64_into(dst: &mut Vec<u8>, x: f64) -> usize {
         if x.is_nan() {
             panic!("NaN not encodable");
@@ -189,8 +189,8 @@ impl LexKey {
         Self::from_bytes(Bytes::copy_from_slice(u.as_bytes()))
     }
 
-    /// Append a UUID’s 16 bytes into `dst` and return 16.
-    #[inline]
+    /// Append a UUID's 16 bytes into `dst` and return 16.
+    #[inline(always)]
     pub fn encode_uuid_into(dst: &mut Vec<u8>, u: &Uuid) -> usize {
         dst.extend_from_slice(u.as_bytes());
         16
@@ -245,6 +245,10 @@ impl LexKey {
     }
 
     pub fn encode_composite(parts: &[&[u8]]) -> Self {
+        if parts.is_empty() {
+            return Self::empty();
+        }
+        
         let cap = Self::composite_capacity(parts);
         let mut buf = BytesMut::with_capacity(cap);
         
