@@ -2,6 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 mod common;
 use common::bench_config;
 use lexkey::LexKey;
+use lexkey::Encodable;
 use uuid::Uuid;
 
 fn bench_encode_string(c: &mut Criterion) {
@@ -115,6 +116,16 @@ fn bench_encode_composite_into_reuse(c: &mut Criterion) {
     });
 }
 
+fn bench_encode_composite_macro(c: &mut Criterion) {
+    let u = Uuid::new_v4();
+    c.bench_function("encode_composite_macro", |b| {
+        b.iter(|| {
+            let k = lexkey::encode_composite!("tenant", 42i64, black_box(true), black_box(&u));
+            black_box(k.as_bytes());
+        })
+    });
+}
+
 fn bench_composite_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("composite_parts_scaling");
 
@@ -154,6 +165,7 @@ criterion_group! {
         bench_encode_i64_into_reuse,
         bench_encode_f64_into_reuse,
         bench_encode_composite_into_reuse,
+        bench_encode_composite_macro,
         bench_composite_scaling,
 }
 

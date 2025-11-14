@@ -2,6 +2,8 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp::Ordering;
 use uuid::Uuid;
 
+use crate::Encodable;
+
 const SIGN_BIT: u64 = 0x8000_0000_0000_0000;
 
 // Small static byte buffers used to avoid allocating tiny Vecs for common single-byte
@@ -307,6 +309,32 @@ impl LexKey {
         Self::from_bytes(enc.freeze())
     }
 
+    /// Encode a composite key from mixed encodable types.
+    ///
+    /// This method pre-calculates the total encoded size, allocates a buffer once,
+    /// and encodes all parts with separators.
+    ///
+    /// Example:
+    /// ```
+    /// use lexkey::LexKey;
+    /// let key = LexKey::encode_composite_encodables(&[&"hello" as &dyn crate::Encodable, &42i64 as &dyn crate::Encodable]);
+    /// ```
+    /// For convenience, use the `encode_composite!` macro instead.
+    pub fn encode_composite_encodables(parts: &[&dyn Encodable]) -> Self {
+        if parts.is_empty() {
+            return Self::empty();
+        }
+        let total_len = parts.iter().map(|p| p.encoded_len()).sum::<usize>() + parts.len().saturating_sub(1);
+        let mut buf = Vec::with_capacity(total_len);
+        for (i, part) in parts.iter().enumerate() {
+            part.encode_into(&mut buf);
+            if i + 1 < parts.len() {
+                buf.push(Self::SEPARATOR);
+            }
+        }
+        Self::from_bytes(buf)
+    }
+
     /// Convert to a lowercase hex string, useful for debugging.
     #[inline]
     pub fn to_hex_string(&self) -> String {
@@ -348,6 +376,67 @@ impl From<&str> for LexKey {
     #[inline]
     fn from(s: &str) -> Self {
         Self::encode_string(s)
+    }
+}
+
+impl Encodable for &str {
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        dst.extend_from_slice(self.as_bytes());
+        self.len()
+    }
+}
+
+impl Encodable for i64 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_i64_into(dst, *self)
+    }
+}
+
+impl Encodable for u64 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_u64_into(dst, *self)
+    }
+}
+
+impl Encodable for f64 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_f64_into(dst, *self)
+    }
+}
+
+impl Encodable for bool {
+    fn encoded_len(&self) -> usize {
+        1
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_bool_into(dst, *self)
+    }
+}
+
+impl Encodable for &Uuid {
+    fn encoded_len(&self) -> usize {
+        16
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_uuid_into(dst, *self)
     }
 }
 
@@ -678,5 +767,13 @@ mod tests {
     fn encoder_encode_f64_into_panics_on_nan() {
         let mut enc = Encoder::with_capacity(8);
         let _ = enc.encode_f64_into(f64::NAN);
+    }
+
+    #[test]
+    fn should_encode_composite_from_mixed_types() {
+        use crate::encode_composite;
+        let key = encode_composite!("hello", 42i64, true);
+        let expected = LexKey::encode_composite(&[b"hello", &LexKey::encode_i64(42).as_bytes()[..], &LexKey::encode_bool(true).as_bytes()[..]]);
+        assert_eq!(key, expected);
     }
 }
