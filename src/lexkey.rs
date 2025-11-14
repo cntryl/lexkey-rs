@@ -314,17 +314,65 @@ impl LexKey {
         Self::from_bytes(enc.freeze())
     }
 
-    /// Encode a composite key from mixed encodable types.
+    /// Encode a range lower bound key for primary keys.
     ///
-    /// This method pre-calculates the total encoded size, allocates a buffer once,
-    /// and encodes all parts with separators.
+    /// For a partition `P` and optional row lower bound `L`:
+    /// - If `L` is provided: `P || 00 || L`
+    /// - If `L` is None: `P || 00`
     ///
-    /// Example:
-    /// ```
-    /// use lexkey::LexKey;
-    /// let key = LexKey::encode_composite_encodables(&[&"hello" as &dyn crate::Encodable, &42i64 as &dyn crate::Encodable]);
-    /// ```
-    /// For convenience, use the `encode_composite!` macro instead.
+    /// This sorts at or before the first key in the range.
+    pub fn encode_range_lower(partition: &[u8], row_lower: Option<&[u8]>) -> Self {
+        match row_lower {
+            Some(row) => Self::encode_composite(&[partition, row]),
+            None => {
+                let mut buf = BytesMut::with_capacity(partition.len() + 1);
+                buf.extend_from_slice(partition);
+                buf.put_u8(Self::SEPARATOR);
+                Self::from_bytes(buf.freeze())
+            }
+        }
+    }
+
+    /// Encode a range upper bound key for primary keys.
+    ///
+    /// For a partition `P` and optional row upper bound `U`:
+    /// - If `U` is provided: `P || 00 || U || ff`
+    /// - If `U` is None: `P || ff`
+    ///
+    /// This sorts after the last key in the range.
+    pub fn encode_range_upper(partition: &[u8], row_upper: Option<&[u8]>) -> Self {
+        match row_upper {
+            Some(row) => {
+                let mut buf = BytesMut::with_capacity(partition.len() + 1 + row.len() + 1);
+                buf.extend_from_slice(partition);
+                buf.put_u8(Self::SEPARATOR);
+                buf.extend_from_slice(row);
+                buf.put_u8(Self::END_MARKER);
+                Self::from_bytes(buf.freeze())
+            }
+            None => {
+                let mut buf = BytesMut::with_capacity(partition.len() + 1);
+                buf.extend_from_slice(partition);
+                buf.put_u8(Self::END_MARKER);
+                Self::from_bytes(buf.freeze())
+            }
+        }
+    }
+
+    /// Encode the full range bounds for a partition.
+    ///
+    /// Returns a tuple `(lower, upper)` where:
+    /// - `lower`: `partition || 00` (inclusive start)
+    /// - `upper`: `partition || ff` (exclusive end)
+    ///
+    /// This covers all rows in the partition.
+    ///
+    /// For mixed-type partitions, use the `encode_range_bounds!` macro.
+    pub fn encode_range_bounds(partition: &[u8]) -> (Self, Self) {
+        let lower = Self::encode_range_lower(partition, None);
+        let upper = Self::encode_range_upper(partition, None);
+        (lower, upper)
+    }
     pub fn encode_composite_encodables(parts: &[&dyn Encodable]) -> Self {
         if parts.is_empty() {
             return Self::empty();
@@ -785,5 +833,57 @@ mod tests {
             LexKey::encode_bool(true).as_bytes(),
         ]);
         assert_eq!(key, expected);
+    }
+
+    #[test]
+    fn should_encode_range_lower_with_row() {
+        let partition = b"part";
+        let row_lower = b"start";
+        let key = LexKey::encode_range_lower(partition, Some(row_lower));
+        let expected = LexKey::encode_composite(&[partition, row_lower]);
+        assert_eq!(key, expected);
+        assert_eq!(key.to_hex_string(), "70617274007374617274");
+    }
+
+    #[test]
+    fn should_encode_range_lower_without_row() {
+        let partition = b"part";
+        let key = LexKey::encode_range_lower(partition, None);
+        assert_eq!(key.to_hex_string(), "7061727400");
+    }
+
+    #[test]
+    fn should_encode_range_upper_with_row() {
+        let partition = b"part";
+        let row_upper = b"end";
+        let key = LexKey::encode_range_upper(partition, Some(row_upper));
+        assert_eq!(key.to_hex_string(), "7061727400656e64ff");
+    }
+
+    #[test]
+    fn should_encode_range_upper_without_row() {
+        let partition = b"part";
+        let key = LexKey::encode_range_upper(partition, None);
+        assert_eq!(key.to_hex_string(), "70617274ff");
+    }
+
+    #[test]
+    fn should_encode_range_bounds() {
+        let partition = b"part";
+        let (lower, upper) = LexKey::encode_range_bounds(partition);
+        assert_eq!(lower.to_hex_string(), "7061727400");
+        assert_eq!(upper.to_hex_string(), "70617274ff");
+    }
+
+    #[test]
+    fn should_encode_range_bounds_macro() {
+        use crate::encode_range_bounds;
+        let (lower, upper) = encode_range_bounds!("tenant", 42i64);
+        let expected_partition =
+            LexKey::encode_composite(&[b"tenant", LexKey::encode_i64(42).as_bytes()]);
+        let (expected_lower, expected_upper) =
+            LexKey::encode_range_bounds(expected_partition.as_bytes());
+        assert_eq!(lower, expected_lower);
+        assert_eq!(upper, expected_upper);
     }
 }

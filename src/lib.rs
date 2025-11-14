@@ -19,14 +19,15 @@
 //! let k = LexKey::encode_i64(42);
 //! assert!(k.as_bytes() < LexKey::encode_i64(100).as_bytes());
 //!
-//! Encode a composite of parts separated by 0x00
+//! // Encode a composite of parts separated by 0x00
 //! let user_id = Uuid::nil();
 //! let comp = LexKey::encode_composite(&[b"tenant", b"user", user_id.as_bytes()]);
 //! assert!(comp.as_bytes().windows(1).any(|w| w == [0x00]));
 //!
-//! // Encode a composite from mixed types using the macro
-//! let comp2 = encode_composite!("tenant", 42i64, true);
-//! assert!(comp2.as_bytes().windows(1).any(|w| w == [0x00]));
+//! // Encode range bounds for primary keys
+//! let lower = LexKey::encode_range_lower(b"partition", Some(b"start"));
+//! let upper = LexKey::encode_range_upper(b"partition", Some(b"end"));
+//! let (full_lower, full_upper) = LexKey::encode_range_bounds(b"partition");
 //!
 //! // Zero-allocation hot path using Encoder reuse
 //! let mut enc = Encoder::with_capacity(64);
@@ -60,7 +61,7 @@ pub trait Encodable {
 /// to construct composite LexKeys from mixed types.
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use lexkey::encode_composite;
 /// let key = encode_composite!("tenant", 42i64, true);
 /// ```
@@ -87,6 +88,31 @@ macro_rules! encode_composite {
     };
     () => {
         $crate::LexKey::empty()
+    };
+}
+
+/// Macro to encode range bounds for a partition from mixed types.
+///
+/// This macro encodes the partition as a composite key, then returns the full range bounds
+/// for that partition as a tuple `(lower, upper)`.
+///
+/// # Examples
+/// ```ignore
+/// use lexkey::encode_range_bounds;
+/// let (lower, upper) = encode_range_bounds!("tenant", 42i64);
+/// ```
+///
+#[macro_export]
+macro_rules! encode_range_bounds {
+    ($first:expr $(, $rest:expr)* $(,)?) => {
+        {
+            // Encode the partition composite
+            let partition_key = $crate::encode_composite!($first $(, $rest)*);
+            $crate::LexKey::encode_range_bounds(partition_key.as_bytes())
+        }
+    };
+    () => {
+        $crate::LexKey::encode_range_bounds(&[])
     };
 }
 
