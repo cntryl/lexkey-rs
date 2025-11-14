@@ -129,9 +129,13 @@ impl LexKey {
     #[must_use]
     pub fn encode_bool(b: bool) -> Self {
         if b {
-            Self { bytes: Bytes::from_static(&BOOL_TRUE) }
+            Self {
+                bytes: Bytes::from_static(&BOOL_TRUE),
+            }
         } else {
-            Self { bytes: Bytes::from_static(&BOOL_FALSE) }
+            Self {
+                bytes: Bytes::from_static(&BOOL_FALSE),
+            }
         }
     }
 
@@ -252,10 +256,10 @@ impl LexKey {
         if parts.is_empty() {
             return Self::empty();
         }
-        
+
         let cap = Self::composite_capacity(parts);
         let mut buf = BytesMut::with_capacity(cap);
-        
+
         for (i, &p) in parts.iter().enumerate() {
             if !p.is_empty() {
                 buf.extend_from_slice(p);
@@ -277,7 +281,8 @@ impl LexKey {
         }
 
         let start = dst.len();
-        let additional = parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
+        let additional =
+            parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
         dst.reserve(additional);
 
         for (i, p) in parts.iter().enumerate() {
@@ -324,7 +329,8 @@ impl LexKey {
         if parts.is_empty() {
             return Self::empty();
         }
-        let total_len = parts.iter().map(|p| p.encoded_len()).sum::<usize>() + parts.len().saturating_sub(1);
+        let total_len =
+            parts.iter().map(|p| p.encoded_len()).sum::<usize>() + parts.len().saturating_sub(1);
         let mut buf = Vec::with_capacity(total_len);
         for (i, part) in parts.iter().enumerate() {
             part.encode_into(&mut buf);
@@ -436,7 +442,7 @@ impl Encodable for &Uuid {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_uuid_into(dst, *self)
+        LexKey::encode_uuid_into(dst, self)
     }
 }
 
@@ -773,7 +779,11 @@ mod tests {
     fn should_encode_composite_from_mixed_types() {
         use crate::encode_composite;
         let key = encode_composite!("hello", 42i64, true);
-        let expected = LexKey::encode_composite(&[b"hello", &LexKey::encode_i64(42).as_bytes()[..], &LexKey::encode_bool(true).as_bytes()[..]]);
+        let expected = LexKey::encode_composite(&[
+            b"hello",
+            LexKey::encode_i64(42).as_bytes(),
+            LexKey::encode_bool(true).as_bytes(),
+        ]);
         assert_eq!(key, expected);
     }
 }

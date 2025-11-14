@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 mod common;
 use common::bench_config;
-use lexkey::LexKey;
 use lexkey::Encodable;
+use lexkey::LexKey;
 use uuid::Uuid;
 
 fn bench_encode_string(c: &mut Criterion) {

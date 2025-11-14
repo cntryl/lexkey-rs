@@ -127,7 +127,7 @@ impl Encoder {
         let total = parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
         self.buf.reserve(total);
         let mut written = 0usize;
-        
+
         for (i, part) in parts.iter().enumerate() {
             if !part.is_empty() {
                 self.buf.extend_from_slice(part);
