@@ -1,6 +1,8 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use uuid::Uuid;
 
+const SIGN_BIT: u64 = 0x8000_0000_0000_0000;
+
 /// A fast, one-way, lexicographically sortable key encoder.
 ///
 /// This encoder produces byte sequences where the natural byte ordering
@@ -30,17 +32,6 @@ impl Encoder {
         self.buf.clear();
     }
 
-    #[inline]
-    fn write_bytes(&mut self, src: &[u8]) -> usize {
-        let len = src.len();
-        if len == 0 {
-            return 0;
-        }
-        self.buf.reserve(len);
-        self.buf.put_slice(src);
-        len
-    }
-
     /// Convert the accumulated buffer into an immutable `Bytes`.
     pub fn freeze(self) -> Bytes {
         self.buf.freeze()
@@ -52,25 +43,33 @@ impl Encoder {
     }
 
     /// Return current buffer length.
+    #[inline]
     pub fn len(&self) -> usize {
         self.buf.len()
     }
 
-    /// Append a single byte.
+    /// Check if buffer is empty.
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
+    }
+
+    /// Append a single byte.
+    #[inline(always)]
     pub fn push_byte(&mut self, b: u8) {
-        self.buf.reserve(1);
         self.buf.put_u8(b);
     }
 
     /// Append a UTF-8 string (raw bytes).
-    #[inline]
+    #[inline(always)]
     pub fn encode_string_into(&mut self, s: &str) -> usize {
-        self.write_bytes(s.as_bytes())
+        let bytes = s.as_bytes();
+        self.buf.extend_from_slice(bytes);
+        bytes.len()
     }
 
     /// Append the canonical 8-byte big-endian encoding of a `u64`.
-    #[inline]
+    #[inline(always)]
     pub fn encode_u64_into(&mut self, n: u64) -> usize {
         self.buf.put_u64(n);
         8
@@ -81,9 +80,9 @@ impl Encoder {
     /// Mapping preserves ordering:
     ///   i64::MIN → 0x00...
     ///   i64::MAX → 0xFF...
-    #[inline]
+    #[inline(always)]
     pub fn encode_i64_into(&mut self, n: i64) -> usize {
-        let u = (n as u64) ^ 0x8000_0000_0000_0000;
+        let u = (n as u64) ^ SIGN_BIT;
         self.buf.put_u64(u);
         8
     }
@@ -94,53 +93,47 @@ impl Encoder {
     /// - Positive floats: flip the sign bit
     ///
     /// NaN is rejected because it breaks total ordering.
-    #[inline]
+    #[inline(always)]
     pub fn encode_f64_into(&mut self, x: f64) -> usize {
         if x.is_nan() {
             panic!("NaN is not encodable in lexkeys");
         }
-
-        let bits = x.to_bits();
-        let enc = if bits >> 63 == 1 {
-            !bits // negative
-        } else {
-            bits ^ 0x8000_0000_0000_0000 // positive
-        };
-
+        let b = x.to_bits();
+        let mask = ((b as i64) >> 63) as u64; // all 1s for negative, 0 for positive
+        let neg = !b;
+        let pos = b ^ SIGN_BIT;
+        let enc = (neg & mask) | (pos & !mask);
         self.buf.put_u64(enc);
         8
     }
 
     /// Append the 16-byte RFC-4122 UUID representation.
-    #[inline]
+    #[inline(always)]
     pub fn encode_uuid_into_buf(&mut self, u: &Uuid) -> usize {
-        self.write_bytes(u.as_bytes())
+        self.buf.extend_from_slice(u.as_bytes());
+        16
     }
 
     /// Append a composite multi-part key separated by `0x00`.
     ///
     /// Parts must not contain interior null bytes. Empty parts are allowed but
     /// never produce double separators. No trailing separator is written.
+    #[inline(always)]
     pub fn encode_composite_into_buf(&mut self, parts: &[&[u8]]) -> usize {
         if parts.is_empty() {
             return 0;
         }
 
-        // Pre-reserve for predictable growth.
-        let total_len =
-            parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
-
-        self.buf.reserve(total_len);
-
+        let total = parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
+        self.buf.reserve(total);
         let mut written = 0usize;
 
         for (i, part) in parts.iter().enumerate() {
             if !part.is_empty() {
-                self.buf.put_slice(part);
+                self.buf.extend_from_slice(part);
                 written += part.len();
             }
 
-            // Add separator only between parts
             if i + 1 < parts.len() {
                 self.buf.put_u8(0x00);
                 written += 1;

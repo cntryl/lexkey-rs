@@ -1,4 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+mod common;
+use common::bench_config;
+use lexkey::Encodable;
 use lexkey::LexKey;
 use uuid::Uuid;
 
@@ -113,6 +116,16 @@ fn bench_encode_composite_into_reuse(c: &mut Criterion) {
     });
 }
 
+fn bench_encode_composite_macro(c: &mut Criterion) {
+    let u = Uuid::new_v4();
+    c.bench_function("encode_composite_macro", |b| {
+        b.iter(|| {
+            let k = lexkey::encode_composite!("tenant", 42i64, black_box(true), black_box(&u));
+            black_box(k.as_bytes());
+        })
+    });
+}
+
 fn bench_composite_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("composite_parts_scaling");
 
@@ -138,19 +151,22 @@ fn bench_composite_scaling(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_encode_string,
-    bench_encode_i64,
-    bench_encode_i64_into,
-    bench_encode_f64,
-    bench_encode_f64_into,
-    bench_encode_composite,
-    bench_encode_composite_into,
-    bench_encode_i64_into_reuse,
-    bench_encode_f64_into_reuse,
-    bench_encode_composite_into_reuse,
-    bench_composite_scaling
-);
+criterion_group! {
+    name = benches;
+    config = bench_config();
+    targets =
+        bench_encode_string,
+        bench_encode_i64,
+        bench_encode_i64_into,
+        bench_encode_f64,
+        bench_encode_f64_into,
+        bench_encode_composite,
+        bench_encode_composite_into,
+        bench_encode_i64_into_reuse,
+        bench_encode_f64_into_reuse,
+        bench_encode_composite_into_reuse,
+        bench_encode_composite_macro,
+        bench_composite_scaling,
+}
 
 criterion_main!(benches);
