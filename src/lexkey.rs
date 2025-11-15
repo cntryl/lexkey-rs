@@ -511,7 +511,7 @@ impl Encodable for u8 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_u64_into(dst, *self as u64)
+        LexKey::encode_u64_into(dst, u64::from(*self))
     }
 }
 
@@ -521,7 +521,7 @@ impl Encodable for u16 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_u64_into(dst, *self as u64)
+        LexKey::encode_u64_into(dst, u64::from(*self))
     }
 }
 
@@ -531,7 +531,7 @@ impl Encodable for u32 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_u64_into(dst, *self as u64)
+        LexKey::encode_u64_into(dst, u64::from(*self))
     }
 }
 
@@ -541,7 +541,7 @@ impl Encodable for i8 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_i64_into(dst, *self as i64)
+        LexKey::encode_i64_into(dst, i64::from(*self))
     }
 }
 
@@ -551,7 +551,7 @@ impl Encodable for i16 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_i64_into(dst, *self as i64)
+        LexKey::encode_i64_into(dst, i64::from(*self))
     }
 }
 
@@ -561,7 +561,7 @@ impl Encodable for i32 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_i64_into(dst, *self as i64)
+        LexKey::encode_i64_into(dst, i64::from(*self))
     }
 }
 
@@ -571,7 +571,7 @@ impl Encodable for f32 {
     }
 
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_f64_into(dst, *self as f64)
+        LexKey::encode_f64_into(dst, f64::from(*self))
     }
 }
 
