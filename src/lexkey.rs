@@ -505,6 +505,99 @@ impl Encodable for &Uuid {
     }
 }
 
+impl Encodable for u8 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_u64_into(dst, *self as u64)
+    }
+}
+
+impl Encodable for u16 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_u64_into(dst, *self as u64)
+    }
+}
+
+impl Encodable for u32 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_u64_into(dst, *self as u64)
+    }
+}
+
+impl Encodable for i8 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_i64_into(dst, *self as i64)
+    }
+}
+
+impl Encodable for i16 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_i64_into(dst, *self as i64)
+    }
+}
+
+impl Encodable for i32 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_i64_into(dst, *self as i64)
+    }
+}
+
+impl Encodable for f32 {
+    fn encoded_len(&self) -> usize {
+        8
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        LexKey::encode_f64_into(dst, *self as f64)
+    }
+}
+
+impl Encodable for String {
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        let bytes = self.as_bytes();
+        dst.extend_from_slice(bytes);
+        bytes.len()
+    }
+}
+
+impl Encodable for Vec<u8> {
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        dst.extend_from_slice(self);
+        self.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -756,6 +849,54 @@ mod tests {
         dst2.push(LexKey::SEPARATOR);
         dst2.extend_from_slice(&buf);
         assert_eq!(dst1, dst2);
+    }
+
+    #[test]
+    fn should_encode_smaller_types_via_encodable_trait() {
+        // Arrange
+        let u8_val: u8 = 42;
+        let u16_val: u16 = 1234;
+        let u32_val: u32 = 56789;
+        let i8_val: i8 = -10;
+        let i16_val: i16 = -1234;
+        let i32_val: i32 = -56789;
+        let f32_val: f32 = 3.14;
+        let string_val = "hello world".to_string();
+        let vec_val = vec![1, 2, 3, 4, 5];
+
+        // Act & Assert
+        assert_eq!(u8_val.encoded_len(), 8);
+        assert_eq!(u16_val.encoded_len(), 8);
+        assert_eq!(u32_val.encoded_len(), 8);
+        assert_eq!(i8_val.encoded_len(), 8);
+        assert_eq!(i16_val.encoded_len(), 8);
+        assert_eq!(i32_val.encoded_len(), 8);
+        assert_eq!(f32_val.encoded_len(), 8);
+        assert_eq!(string_val.encoded_len(), string_val.len());
+        assert_eq!(vec_val.encoded_len(), vec_val.len());
+
+        let mut buf = Vec::new();
+        let written = u8_val.encode_into(&mut buf);
+        assert_eq!(written, 8);
+        assert_eq!(buf.len(), 8);
+
+        // Check that encoding smaller types matches widening
+        let mut buf_u8 = Vec::new();
+        u8_val.encode_into(&mut buf_u8);
+        let mut buf_u64 = Vec::new();
+        LexKey::encode_u64_into(&mut buf_u64, u8_val as u64);
+        assert_eq!(buf_u8, buf_u64);
+
+        // Check String and Vec<u8>
+        let mut buf_str = Vec::new();
+        let written_str = string_val.encode_into(&mut buf_str);
+        assert_eq!(written_str, string_val.len());
+        assert_eq!(buf_str, string_val.as_bytes());
+
+        let mut buf_vec = Vec::new();
+        let written_vec = vec_val.encode_into(&mut buf_vec);
+        assert_eq!(written_vec, vec_val.len());
+        assert_eq!(buf_vec, vec_val);
     }
 
     #[test]
