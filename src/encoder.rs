@@ -21,6 +21,7 @@ pub struct Encoder {
 
 impl Encoder {
     /// Create a new encoder with a capacity hint.
+    #[must_use]
     pub fn with_capacity(cap: usize) -> Self {
         Self {
             buf: BytesMut::with_capacity(cap),
@@ -33,23 +34,27 @@ impl Encoder {
     }
 
     /// Convert the accumulated buffer into an immutable `Bytes`.
+    #[must_use]
     pub fn freeze(self) -> Bytes {
         self.buf.freeze()
     }
 
     /// Borrow the current buffer contents.
+    #[must_use]
     pub fn as_slice(&self) -> &[u8] {
         &self.buf
     }
 
     /// Return current buffer length.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.buf.len()
     }
 
     /// Check if buffer is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.buf.is_empty()
     }
@@ -78,8 +83,8 @@ impl Encoder {
     /// Append the sortable 8-byte encoding of an `i64`.
     ///
     /// Mapping preserves ordering:
-    ///   i64::MIN → 0x00...
-    ///   i64::MAX → 0xFF...
+    ///   `i64::MIN` → 0x00...
+    ///   `i64::MAX` → 0xFF...
     #[inline(always)]
     pub fn encode_i64_into(&mut self, n: i64) -> usize {
         let u = (n as u64) ^ SIGN_BIT;
@@ -93,6 +98,10 @@ impl Encoder {
     /// - Positive floats: flip the sign bit
     ///
     /// NaN is rejected because it breaks total ordering.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `x` is NaN.
     #[inline(always)]
     pub fn encode_f64_into(&mut self, x: f64) -> usize {
         if x.is_nan() {

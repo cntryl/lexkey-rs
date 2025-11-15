@@ -2,7 +2,6 @@
 name = "cntryl-lexkey"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0"
 license-file = "LICENSE"
 readme = "README.md"
 description = "Lexicographically-sortable binary key encodings for numbers, strings, UUIDs and composites."

@@ -38,6 +38,7 @@ impl LexKey {
 
     /// Create an empty key.
     #[inline]
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             bytes: Bytes::new(),
@@ -142,7 +143,7 @@ impl LexKey {
     /// Append the boolean encoding into `dst` and return 1.
     #[inline(always)]
     pub fn encode_bool_into(dst: &mut Vec<u8>, b: bool) -> usize {
-        dst.push(if b { 0x01 } else { 0x00 });
+        dst.push(u8::from(b));
         1
     }
 
@@ -152,6 +153,10 @@ impl LexKey {
     /// optional/absent floating-point values if you need to express missingness.
     /// Negative values are bitwise-not of their IEEE representation; non-negative values are
     /// XOR'd with the sign bit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `x` is NaN.
     #[inline(always)]
     #[must_use]
     pub fn encode_f64(x: f64) -> Self {
@@ -174,6 +179,10 @@ impl LexKey {
     }
 
     /// Append the transformed 8-byte encoding of an `f64` into `dst` (always 8 bytes).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `x` is NaN.
     #[inline(always)]
     pub fn encode_f64_into(dst: &mut Vec<u8>, x: f64) -> usize {
         if x.is_nan() {
@@ -252,6 +261,7 @@ impl LexKey {
         parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1)
     }
 
+    #[must_use]
     pub fn encode_composite(parts: &[&[u8]]) -> Self {
         if parts.is_empty() {
             return Self::empty();
@@ -299,6 +309,7 @@ impl LexKey {
     }
 
     /// Build `encode_first`: `prefix + SEPARATOR` (sorts before keys that extend the same prefix).
+    #[must_use]
     pub fn encode_first(parts: &[&[u8]]) -> Self {
         let mut enc = crate::encoder::Encoder::with_capacity(crate::encode_len(parts) + 1);
         enc.encode_composite_into_buf(parts);
@@ -307,6 +318,7 @@ impl LexKey {
     }
 
     /// Build `encode_last`: `prefix + END_MARKER` (sorts after keys that extend the same prefix).
+    #[must_use]
     pub fn encode_last(parts: &[&[u8]]) -> Self {
         let mut enc = crate::encoder::Encoder::with_capacity(crate::encode_len(parts) + 1);
         enc.encode_composite_into_buf(parts);
@@ -321,15 +333,15 @@ impl LexKey {
     /// - If `L` is None: `P || 00`
     ///
     /// This sorts at or before the first key in the range.
+    #[must_use]
     pub fn encode_range_lower(partition: &[u8], row_lower: Option<&[u8]>) -> Self {
-        match row_lower {
-            Some(row) => Self::encode_composite(&[partition, row]),
-            None => {
-                let mut buf = BytesMut::with_capacity(partition.len() + 1);
-                buf.extend_from_slice(partition);
-                buf.put_u8(Self::SEPARATOR);
-                Self::from_bytes(buf.freeze())
-            }
+        if let Some(row) = row_lower {
+            Self::encode_composite(&[partition, row])
+        } else {
+            let mut buf = BytesMut::with_capacity(partition.len() + 1);
+            buf.extend_from_slice(partition);
+            buf.put_u8(Self::SEPARATOR);
+            Self::from_bytes(buf.freeze())
         }
     }
 
@@ -340,22 +352,20 @@ impl LexKey {
     /// - If `U` is None: `P || ff`
     ///
     /// This sorts after the last key in the range.
+    #[must_use]
     pub fn encode_range_upper(partition: &[u8], row_upper: Option<&[u8]>) -> Self {
-        match row_upper {
-            Some(row) => {
-                let mut buf = BytesMut::with_capacity(partition.len() + 1 + row.len() + 1);
-                buf.extend_from_slice(partition);
-                buf.put_u8(Self::SEPARATOR);
-                buf.extend_from_slice(row);
-                buf.put_u8(Self::END_MARKER);
-                Self::from_bytes(buf.freeze())
-            }
-            None => {
-                let mut buf = BytesMut::with_capacity(partition.len() + 1);
-                buf.extend_from_slice(partition);
-                buf.put_u8(Self::END_MARKER);
-                Self::from_bytes(buf.freeze())
-            }
+        if let Some(row) = row_upper {
+            let mut buf = BytesMut::with_capacity(partition.len() + 1 + row.len() + 1);
+            buf.extend_from_slice(partition);
+            buf.put_u8(Self::SEPARATOR);
+            buf.extend_from_slice(row);
+            buf.put_u8(Self::END_MARKER);
+            Self::from_bytes(buf.freeze())
+        } else {
+            let mut buf = BytesMut::with_capacity(partition.len() + 1);
+            buf.extend_from_slice(partition);
+            buf.put_u8(Self::END_MARKER);
+            Self::from_bytes(buf.freeze())
         }
     }
 
@@ -368,6 +378,7 @@ impl LexKey {
     /// This covers all rows in the partition.
     ///
     /// For mixed-type partitions, use the `encode_range_bounds!` macro.
+    #[must_use]
     pub fn encode_range_bounds(partition: &[u8]) -> (Self, Self) {
         let lower = Self::encode_range_lower(partition, None);
         let upper = Self::encode_range_upper(partition, None);
@@ -748,7 +759,7 @@ mod tests {
     }
 
     #[test]
-    fn encoder_clear_and_as_slice_are_covered() {
+    fn should_clear_encoder_and_expose_as_slice() {
         let mut enc = Encoder::with_capacity(16);
         enc.encode_string_into("abc");
         assert!(!enc.as_slice().is_empty());

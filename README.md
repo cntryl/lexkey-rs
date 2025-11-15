@@ -22,31 +22,12 @@ let user_id = Uuid::nil();
 let comp = LexKey::encode_composite(&[b"tenant", b"user", user_id.as_bytes()]);
 assert!(comp.as_bytes().windows(1).any(|w| w == [0x00]));
 
-## Examples
-
-Run the examples to see common patterns:
-
-```bash
-# Build composite keys with optional values (presence markers)
-cargo run --example encode_demo
-
-# Range query bounds using encode_first/encode_last
-cargo run --example range_queries
-
-# Zero-allocation hot path with Encoder reuse
-cargo run --example hot_path
-```
-
-See the `examples/` directory for detailed code demonstrating:
-- Composite key construction
-- Optional value encoding patterns
-- Prefix-based range queries
-- High-performance buffer reuse
-
 // Zero-allocation hot path using Encoder reuse
+let mut enc = Encoder::with_capacity(64);
 enc.encode_string_into("tenant");
 enc.push_byte(LexKey::SEPARATOR);
 enc.encode_i64_into(123);
+let bytes = enc.freeze();
 assert!(!bytes.is_empty());
 ```
 

@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 mod common;
 use common::bench_config;
 use lexkey::Encodable;
@@ -9,8 +9,8 @@ fn bench_encode_string(c: &mut Criterion) {
     let s = "a very long string used for benchmarking purposes that has some repeating patterns";
     c.bench_function("encode_string", |b| {
         b.iter(|| {
-            let k = LexKey::encode_string(black_box(s));
-            black_box(k.as_bytes());
+            let k = LexKey::encode_string(std::hint::black_box(s));
+            std::hint::black_box(k.as_bytes());
         })
     });
 }
@@ -18,8 +18,8 @@ fn bench_encode_string(c: &mut Criterion) {
 fn bench_encode_i64(c: &mut Criterion) {
     c.bench_function("encode_i64", |b| {
         b.iter(|| {
-            let k = LexKey::encode_i64(black_box(123456789i64));
-            black_box(k.as_bytes());
+            let k = LexKey::encode_i64(std::hint::black_box(123456789i64));
+            std::hint::black_box(k.as_bytes());
         })
     });
 }
@@ -28,8 +28,8 @@ fn bench_encode_i64_into(c: &mut Criterion) {
     c.bench_function("encode_i64_into", |b| {
         b.iter(|| {
             let mut buf = Vec::with_capacity(8); // exact width
-            let n = LexKey::encode_i64_into(&mut buf, black_box(123456789i64));
-            black_box((&buf[..], n));
+            let n = LexKey::encode_i64_into(&mut buf, std::hint::black_box(123456789i64));
+            std::hint::black_box((&buf[..], n));
         })
     });
 }
@@ -37,8 +37,8 @@ fn bench_encode_i64_into(c: &mut Criterion) {
 fn bench_encode_f64(c: &mut Criterion) {
     c.bench_function("encode_f64", |b| {
         b.iter(|| {
-            let k = LexKey::encode_f64(black_box(std::f64::consts::PI));
-            black_box(k.as_bytes());
+            let k = LexKey::encode_f64(std::hint::black_box(std::f64::consts::PI));
+            std::hint::black_box(k.as_bytes());
         })
     });
 }
@@ -47,8 +47,8 @@ fn bench_encode_f64_into(c: &mut Criterion) {
     c.bench_function("encode_f64_into", |b| {
         b.iter(|| {
             let mut buf = Vec::with_capacity(8);
-            let n = LexKey::encode_f64_into(&mut buf, black_box(std::f64::consts::PI));
-            black_box((&buf[..], n));
+            let n = LexKey::encode_f64_into(&mut buf, std::hint::black_box(std::f64::consts::PI));
+            std::hint::black_box((&buf[..], n));
         })
     });
 }
@@ -59,8 +59,8 @@ fn bench_encode_composite(c: &mut Criterion) {
 
     c.bench_function("encode_composite", |b| {
         b.iter(|| {
-            let k = LexKey::encode_composite(black_box(&parts));
-            black_box(k.as_bytes());
+            let k = LexKey::encode_composite(std::hint::black_box(&parts));
+            std::hint::black_box(k.as_bytes());
         })
     });
 }
@@ -73,8 +73,8 @@ fn bench_encode_composite_into(c: &mut Criterion) {
     c.bench_function("encode_composite_into", |b| {
         b.iter(|| {
             let mut buf = Vec::with_capacity(cap);
-            let n = LexKey::encode_composite_into(&mut buf, black_box(&parts));
-            black_box((&buf[..], n));
+            let n = LexKey::encode_composite_into(&mut buf, std::hint::black_box(&parts));
+            std::hint::black_box((&buf[..], n));
         })
     });
 }
@@ -84,8 +84,8 @@ fn bench_encode_i64_into_reuse(c: &mut Criterion) {
         let mut buf = Vec::with_capacity(8);
         b.iter(|| {
             buf.clear();
-            let n = LexKey::encode_i64_into(&mut buf, black_box(123456789i64));
-            black_box((&buf[..], n));
+            let n = LexKey::encode_i64_into(&mut buf, std::hint::black_box(123456789i64));
+            std::hint::black_box((&buf[..], n));
         })
     });
 }
@@ -95,8 +95,8 @@ fn bench_encode_f64_into_reuse(c: &mut Criterion) {
         let mut buf = Vec::with_capacity(8);
         b.iter(|| {
             buf.clear();
-            let n = LexKey::encode_f64_into(&mut buf, black_box(std::f64::consts::PI));
-            black_box((&buf[..], n));
+            let n = LexKey::encode_f64_into(&mut buf, std::hint::black_box(std::f64::consts::PI));
+            std::hint::black_box((&buf[..], n));
         })
     });
 }
@@ -110,8 +110,8 @@ fn bench_encode_composite_into_reuse(c: &mut Criterion) {
         let mut buf = Vec::with_capacity(cap);
         b.iter(|| {
             buf.clear();
-            let n = LexKey::encode_composite_into(&mut buf, black_box(&parts));
-            black_box((&buf[..], n));
+            let n = LexKey::encode_composite_into(&mut buf, std::hint::black_box(&parts));
+            std::hint::black_box((&buf[..], n));
         })
     });
 }
@@ -120,8 +120,13 @@ fn bench_encode_composite_macro(c: &mut Criterion) {
     let u = Uuid::new_v4();
     c.bench_function("encode_composite_macro", |b| {
         b.iter(|| {
-            let k = lexkey::encode_composite!("tenant", 42i64, black_box(true), black_box(&u));
-            black_box(k.as_bytes());
+            let k = lexkey::encode_composite!(
+                "tenant",
+                42i64,
+                std::hint::black_box(true),
+                std::hint::black_box(&u)
+            );
+            std::hint::black_box(k.as_bytes());
         })
     });
 }
@@ -142,8 +147,8 @@ fn bench_composite_scaling(c: &mut Criterion) {
         group.bench_with_input(format!("parts={}", parts), &vec_parts, |b, p| {
             b.iter(|| {
                 let mut buf = Vec::with_capacity(cap);
-                let n = LexKey::encode_composite_into(&mut buf, black_box(p));
-                black_box((&buf[..], n));
+                let n = LexKey::encode_composite_into(&mut buf, std::hint::black_box(p));
+                std::hint::black_box((&buf[..], n));
             })
         });
     }

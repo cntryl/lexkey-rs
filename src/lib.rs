@@ -58,7 +58,7 @@ pub trait Encodable {
 ///
 /// This macro pre-calculates the total encoded size, allocates a buffer once,
 /// and encodes all parts with separators. It is the primary, zero-overhead way
-/// to construct composite LexKeys from mixed types.
+/// to construct composite `LexKeys` from mixed types.
 ///
 /// # Examples
 /// ```ignore
