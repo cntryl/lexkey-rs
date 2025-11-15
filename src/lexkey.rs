@@ -860,7 +860,7 @@ mod tests {
         let i8_val: i8 = -10;
         let i16_val: i16 = -1234;
         let i32_val: i32 = -56789;
-        let f32_val: f32 = 3.14;
+        let f32_val: f32 = std::f32::consts::PI;
         let string_val = "hello world".to_string();
         let vec_val = vec![1, 2, 3, 4, 5];
 
