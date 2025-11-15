@@ -1,9 +1,5 @@
 # lexkey-rs
 
-[![Crates.io](https://img.shields.io/crates/v/cntryl-lexkey.svg)](https://crates.io/crates/cntryl-lexkey)
-[![Documentation](https://docs.rs/cntryl-lexkey/badge.svg)](https://docs.rs/cntryl-lexkey)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Build Status](https://github.com/cntryl/lexkey-rs/workflows/CI/badge.svg)](https://github.com/cntryl/lexkey-rs/actions)
 
 Lexicographically sortable byte keys for numbers, strings, UUIDs, and composites.
 
