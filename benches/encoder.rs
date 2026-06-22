@@ -155,6 +155,36 @@ fn bench_encoder_composite_reuse(c: &mut Criterion) {
     });
 }
 
+fn bench_encoder_fitz_domain_prefix_freeze_to_vec(c: &mut Criterion) {
+    let realm = "acme";
+    let domain = b"kv";
+    c.bench_function("encoder_fitz_domain_prefix_freeze_to_vec", |b| {
+        b.iter(|| {
+            let mut enc = Encoder::with_capacity(realm.len() + domain.len() + 2);
+            enc.encode_string_into(std::hint::black_box(realm));
+            enc.push_byte(LexKey::SEPARATOR);
+            enc.encode_composite_into_buf(&[std::hint::black_box(domain.as_slice())]);
+            enc.push_byte(LexKey::SEPARATOR);
+            std::hint::black_box(enc.freeze().to_vec());
+        })
+    });
+}
+
+fn bench_encoder_fitz_domain_prefix_into_vec(c: &mut Criterion) {
+    let realm = "acme";
+    let domain = b"kv";
+    c.bench_function("encoder_fitz_domain_prefix_into_vec", |b| {
+        b.iter(|| {
+            let mut enc = Encoder::with_capacity(realm.len() + domain.len() + 2);
+            enc.encode_string_into(std::hint::black_box(realm));
+            enc.push_separator();
+            enc.encode_bytes_into(std::hint::black_box(domain.as_slice()));
+            enc.push_separator();
+            std::hint::black_box(enc.into_vec());
+        })
+    });
+}
+
 criterion_group! {
     name = encoder_benches;
     config = bench_config();
@@ -171,5 +201,7 @@ criterion_group! {
         bench_encoder_uuid_reuse,
         bench_encoder_composite_new,
         bench_encoder_composite_reuse,
+        bench_encoder_fitz_domain_prefix_freeze_to_vec,
+        bench_encoder_fitz_domain_prefix_into_vec,
 }
 criterion_main!(encoder_benches);
