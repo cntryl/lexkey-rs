@@ -23,7 +23,7 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Check Syntax
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic
 
       - name: Build
         run: cargo build
