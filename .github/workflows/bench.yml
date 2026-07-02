@@ -10,10 +10,14 @@ permissions:
 jobs:
   bench:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Build Benchmarks
+        run: cargo bench --no-run
 
       - name: Run LexKey Benchmarks
         run: cargo bench --bench lexkey -- --noplot
