@@ -78,7 +78,7 @@ impl LexKey {
     /// let k = LexKey::encode_string("hello");
     /// assert_eq!(k.as_bytes(), b"hello");
     /// ```
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_string(s: &str) -> Self {
         Self::from_bytes(Bytes::copy_from_slice(s.as_bytes()))
@@ -94,7 +94,7 @@ impl LexKey {
     /// use lexkey::LexKey;
     /// assert_eq!(LexKey::encode_u64(123).to_hex_string(), "000000000000007b");
     /// ```
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_u64(n: u64) -> Self {
         let bytes = n.to_be_bytes();
@@ -102,21 +102,21 @@ impl LexKey {
     }
 
     /// Encode an unsigned 8-bit integer as 1 byte.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_u8(n: u8) -> Self {
         Self::from_bytes(Bytes::copy_from_slice(&[n]))
     }
 
     /// Encode an unsigned 16-bit integer as 2-byte big-endian.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_u16(n: u16) -> Self {
         Self::from_bytes(Bytes::copy_from_slice(&n.to_be_bytes()))
     }
 
     /// Encode an unsigned 32-bit integer as 4-byte big-endian.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_u32(n: u32) -> Self {
         Self::from_bytes(Bytes::copy_from_slice(&n.to_be_bytes()))
@@ -124,28 +124,28 @@ impl LexKey {
 
     /// Append the 8-byte big-endian encoding of `n` into `dst`.
     /// Returns the number of bytes written (always 8).
-    #[inline(always)]
+    #[inline]
     pub fn encode_u64_into(dst: &mut Vec<u8>, n: u64) -> usize {
         dst.extend_from_slice(&n.to_be_bytes());
         8
     }
 
     /// Append the 1-byte encoding of `n` into `dst`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u8_into(dst: &mut Vec<u8>, n: u8) -> usize {
         dst.push(n);
         1
     }
 
     /// Append the 2-byte big-endian encoding of `n` into `dst`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u16_into(dst: &mut Vec<u8>, n: u16) -> usize {
         dst.extend_from_slice(&n.to_be_bytes());
         2
     }
 
     /// Append the 4-byte big-endian encoding of `n` into `dst`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u32_into(dst: &mut Vec<u8>, n: u32) -> usize {
         dst.extend_from_slice(&n.to_be_bytes());
         4
@@ -154,70 +154,70 @@ impl LexKey {
     /// Encode a signed integer so that lexicographic order matches numeric order.
     ///
     /// Transform: `(n as u64) ^ 0x8000_0000_0000_0000`, then big-endian.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_i64(n: i64) -> Self {
-        let transformed = (n as u64) ^ SIGN_BIT;
+        let transformed = n.cast_unsigned() ^ SIGN_BIT;
         let bytes = transformed.to_be_bytes();
         Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
     /// Encode a signed 8-bit integer so lexicographic order matches numeric order.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_i8(n: i8) -> Self {
-        Self::from_bytes(Bytes::copy_from_slice(&[((n as u8) ^ SIGN_BIT_8)]))
+        Self::from_bytes(Bytes::copy_from_slice(&[n.cast_unsigned() ^ SIGN_BIT_8]))
     }
 
     /// Encode a signed 16-bit integer so lexicographic order matches numeric order.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_i16(n: i16) -> Self {
-        let transformed = (n as u16) ^ SIGN_BIT_16;
+        let transformed = n.cast_unsigned() ^ SIGN_BIT_16;
         Self::from_bytes(Bytes::copy_from_slice(&transformed.to_be_bytes()))
     }
 
     /// Encode a signed 32-bit integer so lexicographic order matches numeric order.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_i32(n: i32) -> Self {
-        let transformed = (n as u32) ^ SIGN_BIT_32;
+        let transformed = n.cast_unsigned() ^ SIGN_BIT_32;
         Self::from_bytes(Bytes::copy_from_slice(&transformed.to_be_bytes()))
     }
 
     /// Append the transformed 8-byte encoding of an `i64` into `dst` (always 8 bytes).
-    #[inline(always)]
+    #[inline]
     pub fn encode_i64_into(dst: &mut Vec<u8>, n: i64) -> usize {
-        let t = (n as u64) ^ SIGN_BIT;
+        let t = n.cast_unsigned() ^ SIGN_BIT;
         dst.extend_from_slice(&t.to_be_bytes());
         8
     }
 
     /// Append the transformed 1-byte encoding of an `i8` into `dst`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_i8_into(dst: &mut Vec<u8>, n: i8) -> usize {
-        dst.push((n as u8) ^ SIGN_BIT_8);
+        dst.push(n.cast_unsigned() ^ SIGN_BIT_8);
         1
     }
 
     /// Append the transformed 2-byte big-endian encoding of an `i16` into `dst`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_i16_into(dst: &mut Vec<u8>, n: i16) -> usize {
-        let t = (n as u16) ^ SIGN_BIT_16;
+        let t = n.cast_unsigned() ^ SIGN_BIT_16;
         dst.extend_from_slice(&t.to_be_bytes());
         2
     }
 
     /// Append the transformed 4-byte big-endian encoding of an `i32` into `dst`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_i32_into(dst: &mut Vec<u8>, n: i32) -> usize {
-        let t = (n as u32) ^ SIGN_BIT_32;
+        let t = n.cast_unsigned() ^ SIGN_BIT_32;
         dst.extend_from_slice(&t.to_be_bytes());
         4
     }
 
     /// Encode a boolean: `false -> 0x00`, `true -> 0x01`.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_bool(b: bool) -> Self {
         if b {
@@ -232,7 +232,7 @@ impl LexKey {
     }
 
     /// Append the boolean encoding into `dst` and return 1.
-    #[inline(always)]
+    #[inline]
     pub fn encode_bool_into(dst: &mut Vec<u8>, b: bool) -> usize {
         dst.push(u8::from(b));
         1
@@ -248,15 +248,13 @@ impl LexKey {
     /// # Panics
     ///
     /// Panics if `x` is NaN.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_f64(x: f64) -> Self {
-        if x.is_nan() {
-            panic!("NaN is not encodable");
-        }
+        assert!(!x.is_nan(), "NaN is not encodable");
 
         let b = x.to_bits();
-        let sign_mask = ((b as i64) >> 63) as u64; // all 1s for negative, 0 for positive
+        let sign_mask = 0u64.wrapping_sub(b >> 63); // all 1s for negative, 0 for positive
 
         // branchless:
         // negative → !b
@@ -274,15 +272,13 @@ impl LexKey {
     /// # Panics
     ///
     /// Panics if `x` is NaN.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_f32(x: f32) -> Self {
-        if x.is_nan() {
-            panic!("NaN is not encodable");
-        }
+        assert!(!x.is_nan(), "NaN is not encodable");
 
         let b = x.to_bits();
-        let mask = ((b as i32) >> 31) as u32;
+        let mask = 0u32.wrapping_sub(b >> 31);
         let neg = !b;
         let pos = b ^ SIGN_BIT_32;
         let transformed = (neg & mask) | (pos & !mask);
@@ -295,14 +291,12 @@ impl LexKey {
     /// # Panics
     ///
     /// Panics if `x` is NaN.
-    #[inline(always)]
+    #[inline]
     pub fn encode_f64_into(dst: &mut Vec<u8>, x: f64) -> usize {
-        if x.is_nan() {
-            panic!("NaN not encodable");
-        }
+        assert!(!x.is_nan(), "NaN not encodable");
 
         let b = x.to_bits();
-        let mask = ((b as i64) >> 63) as u64;
+        let mask = 0u64.wrapping_sub(b >> 63);
         let neg = !b;
         let pos = b ^ SIGN_BIT;
         let transformed = (neg & mask) | (pos & !mask);
@@ -316,14 +310,12 @@ impl LexKey {
     /// # Panics
     ///
     /// Panics if `x` is NaN.
-    #[inline(always)]
+    #[inline]
     pub fn encode_f32_into(dst: &mut Vec<u8>, x: f32) -> usize {
-        if x.is_nan() {
-            panic!("NaN not encodable");
-        }
+        assert!(!x.is_nan(), "NaN not encodable");
 
         let b = x.to_bits();
-        let mask = ((b as i32) >> 31) as u32;
+        let mask = 0u32.wrapping_sub(b >> 31);
         let neg = !b;
         let pos = b ^ SIGN_BIT_32;
         let transformed = (neg & mask) | (pos & !mask);
@@ -333,28 +325,28 @@ impl LexKey {
     }
 
     /// Encode a UUID as its 16 raw RFC4122 bytes.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_uuid(u: &Uuid) -> Self {
         Self::from_bytes(Bytes::copy_from_slice(u.as_bytes()))
     }
 
     /// Append a UUID's 16 bytes into `dst` and return 16.
-    #[inline(always)]
+    #[inline]
     pub fn encode_uuid_into(dst: &mut Vec<u8>, u: &Uuid) -> usize {
         dst.extend_from_slice(u.as_bytes());
         16
     }
 
     /// Encode a UTC timestamp represented as UNIX nanoseconds.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_time_unix_nanos(nanos: i64) -> Self {
         Self::encode_i64(nanos)
     }
 
     /// Encode the end sentinel as a single `0xFF` byte.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn encode_end_marker() -> Self {
         Self {
@@ -597,8 +589,12 @@ impl LexKey {
         if parts.is_empty() {
             return Self::empty();
         }
-        let total_len =
-            parts.iter().map(|p| p.encoded_len()).sum::<usize>() + parts.len().saturating_sub(1);
+        let total_len = parts
+            .iter()
+            .copied()
+            .map(Encodable::encoded_len)
+            .sum::<usize>()
+            + parts.len().saturating_sub(1);
         let mut buf = Vec::with_capacity(total_len);
         for (i, part) in parts.iter().enumerate() {
             part.encode_into(&mut buf);
@@ -1007,7 +1003,7 @@ mod tests {
         // Arrange
         let i8_v: i8 = -100;
         let i16_v: i16 = -12345;
-        let i32_v: i32 = 12345678;
+        let i32_v: i32 = 12_345_678;
 
         // Act & Assert
         assert_eq!(LexKey::encode_i8(i8_v).to_hex_string(), "1c");
@@ -1246,40 +1242,40 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "NaN is not encodable")]
     fn encode_f64_allocating_panics_on_nan() {
         let _ = LexKey::encode_f64(f64::NAN);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "NaN not encodable")]
     fn encode_f64_into_panics_on_nan() {
         let mut buf = Vec::new();
         let _ = LexKey::encode_f64_into(&mut buf, f64::NAN);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "NaN is not encodable in lexkeys")]
     fn encoder_encode_f64_into_panics_on_nan() {
         let mut enc = Encoder::with_capacity(8);
         let _ = enc.encode_f64_into(f64::NAN);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "NaN is not encodable")]
     fn encode_f32_allocating_panics_on_nan() {
         let _ = LexKey::encode_f32(f32::NAN);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "NaN not encodable")]
     fn encode_f32_into_panics_on_nan() {
         let mut buf = Vec::new();
         let _ = LexKey::encode_f32_into(&mut buf, f32::NAN);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "NaN is not encodable in lexkeys")]
     fn encoder_encode_f32_into_panics_on_nan() {
         let mut enc = Encoder::with_capacity(4);
         let _ = enc.encode_f32_into(f32::NAN);

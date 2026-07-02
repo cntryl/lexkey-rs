@@ -13,7 +13,7 @@ fn bench_encoder_string_new(c: &mut Criterion) {
             let n = enc.encode_string_into(std::hint::black_box(s));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -27,7 +27,7 @@ fn bench_encoder_string_reuse(c: &mut Criterion) {
             let n = enc.encode_string_into(std::hint::black_box(s));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -39,7 +39,7 @@ fn bench_encoder_u64_new(c: &mut Criterion) {
             let n = enc.encode_u64_into(std::hint::black_box(v));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -52,7 +52,7 @@ fn bench_encoder_u64_reuse(c: &mut Criterion) {
             let n = enc.encode_u64_into(std::hint::black_box(v));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -60,10 +60,10 @@ fn bench_encoder_i64_new(c: &mut Criterion) {
     c.bench_function("encoder_i64_new", |b| {
         b.iter(|| {
             let mut enc = Encoder::with_capacity(8);
-            let n = enc.encode_i64_into(std::hint::black_box(-123456789i64));
+            let n = enc.encode_i64_into(std::hint::black_box(-123_456_789_i64));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -72,10 +72,10 @@ fn bench_encoder_i64_reuse(c: &mut Criterion) {
         let mut enc = Encoder::with_capacity(8);
         b.iter(|| {
             enc.clear();
-            let n = enc.encode_i64_into(std::hint::black_box(-123456789i64));
+            let n = enc.encode_i64_into(std::hint::black_box(-123_456_789_i64));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -86,7 +86,7 @@ fn bench_encoder_f64_new(c: &mut Criterion) {
             let n = enc.encode_f64_into(std::hint::black_box(std::f64::consts::PI));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -98,7 +98,7 @@ fn bench_encoder_f64_reuse(c: &mut Criterion) {
             let n = enc.encode_f64_into(std::hint::black_box(std::f64::consts::PI));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -110,7 +110,7 @@ fn bench_encoder_uuid_new(c: &mut Criterion) {
             let n = enc.encode_uuid_into_buf(std::hint::black_box(&u));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -123,7 +123,7 @@ fn bench_encoder_uuid_reuse(c: &mut Criterion) {
             let n = enc.encode_uuid_into_buf(std::hint::black_box(&u));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -136,7 +136,7 @@ fn bench_encoder_composite_new(c: &mut Criterion) {
             let n = enc.encode_composite_into_buf(std::hint::black_box(&parts));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -151,7 +151,7 @@ fn bench_encoder_composite_reuse(c: &mut Criterion) {
             let n = enc.encode_composite_into_buf(std::hint::black_box(&parts));
             std::hint::black_box(enc.as_slice());
             std::hint::black_box(n);
-        })
+        });
     });
 }
 
@@ -166,7 +166,7 @@ fn bench_encoder_fitz_domain_prefix_freeze_to_vec(c: &mut Criterion) {
             enc.encode_composite_into_buf(&[std::hint::black_box(domain.as_slice())]);
             enc.push_byte(LexKey::SEPARATOR);
             std::hint::black_box(enc.freeze().to_vec());
-        })
+        });
     });
 }
 
@@ -181,7 +181,7 @@ fn bench_encoder_fitz_domain_prefix_into_vec(c: &mut Criterion) {
             enc.encode_bytes_into(std::hint::black_box(domain.as_slice()));
             enc.push_separator();
             std::hint::black_box(enc.into_vec());
-        })
+        });
     });
 }
 
