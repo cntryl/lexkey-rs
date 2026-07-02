@@ -1,7 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 mod common;
 use common::bench_config;
-use lexkey::Encodable;
 use lexkey::LexKey;
 use uuid::Uuid;
 
@@ -156,6 +155,38 @@ fn bench_composite_scaling(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_prefix_end_via_range_upper(c: &mut Criterion) {
+    let prefix = b"acme\0kv\0users\0profile\0";
+    c.bench_function("prefix_end_via_range_upper", |b| {
+        b.iter(|| {
+            let out = LexKey::encode_range_upper(std::hint::black_box(prefix), None)
+                .as_bytes()
+                .to_vec();
+            std::hint::black_box(out);
+        })
+    });
+}
+
+fn bench_prefix_end_vec(c: &mut Criterion) {
+    let prefix = b"acme\0kv\0users\0profile\0";
+    c.bench_function("prefix_end_vec", |b| {
+        b.iter(|| {
+            let out = LexKey::prefix_end(std::hint::black_box(prefix));
+            std::hint::black_box(out);
+        })
+    });
+}
+
+fn bench_prefix_successor(c: &mut Criterion) {
+    let prefix = b"acme\0kv\0users\0profile\xff\xff";
+    c.bench_function("prefix_successor", |b| {
+        b.iter(|| {
+            let out = LexKey::prefix_successor(std::hint::black_box(prefix));
+            std::hint::black_box(out);
+        })
+    });
+}
+
 criterion_group! {
     name = benches;
     config = bench_config();
@@ -172,6 +203,9 @@ criterion_group! {
         bench_encode_composite_into_reuse,
         bench_encode_composite_macro,
         bench_composite_scaling,
+        bench_prefix_end_via_range_upper,
+        bench_prefix_end_vec,
+        bench_prefix_successor,
 }
 
 criterion_main!(benches);
