@@ -73,25 +73,25 @@ impl Encoder {
     }
 
     /// Append a single byte.
-    #[inline(always)]
+    #[inline]
     pub fn push_byte(&mut self, b: u8) {
         self.buf.push(b);
     }
 
     /// Append the composite part separator (`0x00`).
-    #[inline(always)]
+    #[inline]
     pub fn push_separator(&mut self) {
         self.buf.push(crate::LexKey::SEPARATOR);
     }
 
     /// Append the range end marker (`0xff`).
-    #[inline(always)]
+    #[inline]
     pub fn push_end_marker(&mut self) {
         self.buf.push(crate::LexKey::END_MARKER);
     }
 
     /// Append a UTF-8 string (raw bytes).
-    #[inline(always)]
+    #[inline]
     pub fn encode_string_into(&mut self, s: &str) -> usize {
         let bytes = s.as_bytes();
         self.buf.extend_from_slice(bytes);
@@ -99,35 +99,35 @@ impl Encoder {
     }
 
     /// Append raw bytes without transformation.
-    #[inline(always)]
+    #[inline]
     pub fn encode_bytes_into(&mut self, bytes: &[u8]) -> usize {
         self.buf.extend_from_slice(bytes);
         bytes.len()
     }
 
     /// Append the 8-byte big-endian encoding of a `u64`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u64_into(&mut self, n: u64) -> usize {
         self.buf.extend_from_slice(&n.to_be_bytes());
         8
     }
 
     /// Append the native 1-byte encoding of a `u8`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u8_into(&mut self, n: u8) -> usize {
         self.buf.push(n);
         1
     }
 
     /// Append the native 2-byte big-endian encoding of a `u16`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u16_into(&mut self, n: u16) -> usize {
         self.buf.extend_from_slice(&n.to_be_bytes());
         2
     }
 
     /// Append the native 4-byte big-endian encoding of a `u32`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_u32_into(&mut self, n: u32) -> usize {
         self.buf.extend_from_slice(&n.to_be_bytes());
         4
@@ -138,32 +138,32 @@ impl Encoder {
     /// Mapping preserves ordering:
     ///   `i64::MIN` → 0x00...
     ///   `i64::MAX` → 0xFF...
-    #[inline(always)]
+    #[inline]
     pub fn encode_i64_into(&mut self, n: i64) -> usize {
-        let u = (n as u64) ^ SIGN_BIT;
+        let u = n.cast_unsigned() ^ SIGN_BIT;
         self.buf.extend_from_slice(&u.to_be_bytes());
         8
     }
 
     /// Append the native 1-byte sortable encoding of an `i8`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_i8_into(&mut self, n: i8) -> usize {
-        self.buf.push((n as u8) ^ SIGN_BIT_8);
+        self.buf.push(n.cast_unsigned() ^ SIGN_BIT_8);
         1
     }
 
     /// Append the native 2-byte sortable encoding of an `i16`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_i16_into(&mut self, n: i16) -> usize {
-        let u = (n as u16) ^ SIGN_BIT_16;
+        let u = n.cast_unsigned() ^ SIGN_BIT_16;
         self.buf.extend_from_slice(&u.to_be_bytes());
         2
     }
 
     /// Append the native 4-byte sortable encoding of an `i32`.
-    #[inline(always)]
+    #[inline]
     pub fn encode_i32_into(&mut self, n: i32) -> usize {
-        let u = (n as u32) ^ SIGN_BIT_32;
+        let u = n.cast_unsigned() ^ SIGN_BIT_32;
         self.buf.extend_from_slice(&u.to_be_bytes());
         4
     }
@@ -178,13 +178,11 @@ impl Encoder {
     /// # Panics
     ///
     /// Panics if `x` is NaN.
-    #[inline(always)]
+    #[inline]
     pub fn encode_f64_into(&mut self, x: f64) -> usize {
-        if x.is_nan() {
-            panic!("NaN is not encodable in lexkeys");
-        }
+        assert!(!x.is_nan(), "NaN is not encodable in lexkeys");
         let b = x.to_bits();
-        let mask = ((b as i64) >> 63) as u64; // all 1s for negative, 0 for positive
+        let mask = 0u64.wrapping_sub(b >> 63); // all 1s for negative, 0 for positive
         let neg = !b;
         let pos = b ^ SIGN_BIT;
         let enc = (neg & mask) | (pos & !mask);
@@ -197,13 +195,11 @@ impl Encoder {
     /// # Panics
     ///
     /// Panics if `x` is NaN.
-    #[inline(always)]
+    #[inline]
     pub fn encode_f32_into(&mut self, x: f32) -> usize {
-        if x.is_nan() {
-            panic!("NaN is not encodable in lexkeys");
-        }
+        assert!(!x.is_nan(), "NaN is not encodable in lexkeys");
         let b = x.to_bits();
-        let mask = ((b as i32) >> 31) as u32;
+        let mask = 0u32.wrapping_sub(b >> 31);
         let neg = !b;
         let pos = b ^ SIGN_BIT_32;
         let enc = (neg & mask) | (pos & !mask);
@@ -212,7 +208,7 @@ impl Encoder {
     }
 
     /// Append the 16-byte RFC-4122 UUID representation.
-    #[inline(always)]
+    #[inline]
     pub fn encode_uuid_into_buf(&mut self, u: &Uuid) -> usize {
         self.buf.extend_from_slice(u.as_bytes());
         16
@@ -222,7 +218,7 @@ impl Encoder {
     ///
     /// Parts are copied as-is. Empty parts are allowed and can produce adjacent
     /// separators because every adjacent part pair is separated. No trailing separator is written.
-    #[inline(always)]
+    #[inline]
     pub fn encode_composite_into_buf(&mut self, parts: &[&[u8]]) -> usize {
         if parts.is_empty() {
             return 0;
@@ -271,7 +267,7 @@ mod tests {
     #[test]
     fn should_return_eight_when_encoding_u64() {
         let mut enc = Encoder::with_capacity(64);
-        let n = enc.encode_u64_into(0x0102030405060708);
+        let n = enc.encode_u64_into(0x0102_0304_0506_0708);
         assert_eq!(n, 8);
     }
 
@@ -280,7 +276,7 @@ mod tests {
         let mut enc = Encoder::with_capacity(64);
         assert_eq!(enc.encode_u8_into(0x12), 1);
         assert_eq!(enc.encode_u16_into(0x3456), 2);
-        assert_eq!(enc.encode_u32_into(0x789abcde), 4);
+        assert_eq!(enc.encode_u32_into(0x789a_bcde), 4);
         assert_eq!(enc.as_slice(), &[0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde]);
     }
 

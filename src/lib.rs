@@ -75,7 +75,7 @@ macro_rules! encode_composite {
     ($first:expr $(, $rest:expr)* $(,)?) => {
         {
             let parts = (&$first $(, &$rest)*,);
-            $crate::__private::encode_composite_tuple(parts)
+            $crate::__private::encode_composite_tuple(&parts)
         }
     };
     () => {
@@ -177,8 +177,8 @@ pub mod __private {
         fn encode_into(&self, dst: &mut Vec<u8>) -> usize;
     }
 
-    #[inline(always)]
-    pub fn encode_composite_tuple<T: EncodableTuple>(parts: T) -> LexKey {
+    #[inline]
+    pub fn encode_composite_tuple<T: EncodableTuple>(parts: &T) -> LexKey {
         let mut buf = Vec::with_capacity(parts.encoded_len());
         parts.encode_into(&mut buf);
         LexKey::from_bytes(buf)
@@ -190,13 +190,13 @@ pub mod __private {
             where
                 $($ty: Encodable,)+
             {
-                #[inline(always)]
+                #[inline]
                 fn encoded_len(&self) -> usize {
                     let ($($value,)+) = self;
                     0 $(+ $value.encoded_len())+ + impl_encodable_tuple!(@separators $($ty),+)
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
                     let start = dst.len();
                     let ($($value,)+) = self;

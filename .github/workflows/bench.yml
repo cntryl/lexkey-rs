@@ -1,0 +1,30 @@
+name: Bench
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run LexKey Benchmarks
+        run: cargo bench --bench lexkey -- --noplot
+
+      - name: Run Encoder Benchmarks
+        run: cargo bench --bench encoder -- --noplot
+
+      - name: Upload Benchmark Results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: criterion-results
+          path: target/criterion
+          retention-days: 30

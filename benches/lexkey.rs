@@ -10,16 +10,16 @@ fn bench_encode_string(c: &mut Criterion) {
         b.iter(|| {
             let k = LexKey::encode_string(std::hint::black_box(s));
             std::hint::black_box(k.as_bytes());
-        })
+        });
     });
 }
 
 fn bench_encode_i64(c: &mut Criterion) {
     c.bench_function("encode_i64", |b| {
         b.iter(|| {
-            let k = LexKey::encode_i64(std::hint::black_box(123456789i64));
+            let k = LexKey::encode_i64(std::hint::black_box(123_456_789_i64));
             std::hint::black_box(k.as_bytes());
-        })
+        });
     });
 }
 
@@ -27,9 +27,9 @@ fn bench_encode_i64_into(c: &mut Criterion) {
     c.bench_function("encode_i64_into", |b| {
         b.iter(|| {
             let mut buf = Vec::with_capacity(8); // exact width
-            let n = LexKey::encode_i64_into(&mut buf, std::hint::black_box(123456789i64));
+            let n = LexKey::encode_i64_into(&mut buf, std::hint::black_box(123_456_789_i64));
             std::hint::black_box((&buf[..], n));
-        })
+        });
     });
 }
 
@@ -38,7 +38,7 @@ fn bench_encode_f64(c: &mut Criterion) {
         b.iter(|| {
             let k = LexKey::encode_f64(std::hint::black_box(std::f64::consts::PI));
             std::hint::black_box(k.as_bytes());
-        })
+        });
     });
 }
 
@@ -48,7 +48,7 @@ fn bench_encode_f64_into(c: &mut Criterion) {
             let mut buf = Vec::with_capacity(8);
             let n = LexKey::encode_f64_into(&mut buf, std::hint::black_box(std::f64::consts::PI));
             std::hint::black_box((&buf[..], n));
-        })
+        });
     });
 }
 
@@ -60,7 +60,7 @@ fn bench_encode_composite(c: &mut Criterion) {
         b.iter(|| {
             let k = LexKey::encode_composite(std::hint::black_box(&parts));
             std::hint::black_box(k.as_bytes());
-        })
+        });
     });
 }
 
@@ -74,7 +74,7 @@ fn bench_encode_composite_into(c: &mut Criterion) {
             let mut buf = Vec::with_capacity(cap);
             let n = LexKey::encode_composite_into(&mut buf, std::hint::black_box(&parts));
             std::hint::black_box((&buf[..], n));
-        })
+        });
     });
 }
 
@@ -83,9 +83,9 @@ fn bench_encode_i64_into_reuse(c: &mut Criterion) {
         let mut buf = Vec::with_capacity(8);
         b.iter(|| {
             buf.clear();
-            let n = LexKey::encode_i64_into(&mut buf, std::hint::black_box(123456789i64));
+            let n = LexKey::encode_i64_into(&mut buf, std::hint::black_box(123_456_789_i64));
             std::hint::black_box((&buf[..], n));
-        })
+        });
     });
 }
 
@@ -96,7 +96,7 @@ fn bench_encode_f64_into_reuse(c: &mut Criterion) {
             buf.clear();
             let n = LexKey::encode_f64_into(&mut buf, std::hint::black_box(std::f64::consts::PI));
             std::hint::black_box((&buf[..], n));
-        })
+        });
     });
 }
 
@@ -111,7 +111,7 @@ fn bench_encode_composite_into_reuse(c: &mut Criterion) {
             buf.clear();
             let n = LexKey::encode_composite_into(&mut buf, std::hint::black_box(&parts));
             std::hint::black_box((&buf[..], n));
-        })
+        });
     });
 }
 
@@ -126,7 +126,7 @@ fn bench_encode_composite_macro(c: &mut Criterion) {
                 std::hint::black_box(&u)
             );
             std::hint::black_box(k.as_bytes());
-        })
+        });
     });
 }
 
@@ -134,7 +134,7 @@ fn bench_composite_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("composite_parts_scaling");
 
     // Use exponential growth so the curve is really obvious
-    for parts in [1usize, 2, 4, 8, 16, 32, 64, 128, 256].iter().cloned() {
+    for parts in [1usize, 2, 4, 8, 16, 32, 64, 128, 256].iter().copied() {
         // Build synthetic parts of realistic size
         // 8-byte slices mimic UUIDs, timestamps, numeric components, etc.
         let piece = [0u8; 8];
@@ -143,12 +143,12 @@ fn bench_composite_scaling(c: &mut Criterion) {
         // Precompute capacity so we benchmark encoding, not allocation
         let cap = parts * piece.len() + (parts - 1);
 
-        group.bench_with_input(format!("parts={}", parts), &vec_parts, |b, p| {
+        group.bench_with_input(format!("parts={parts}"), &vec_parts, |b, p| {
             b.iter(|| {
                 let mut buf = Vec::with_capacity(cap);
                 let n = LexKey::encode_composite_into(&mut buf, std::hint::black_box(p));
                 std::hint::black_box((&buf[..], n));
-            })
+            });
         });
     }
 
@@ -163,7 +163,7 @@ fn bench_prefix_end_via_range_upper(c: &mut Criterion) {
                 .as_bytes()
                 .to_vec();
             std::hint::black_box(out);
-        })
+        });
     });
 }
 
@@ -173,7 +173,7 @@ fn bench_prefix_end_vec(c: &mut Criterion) {
         b.iter(|| {
             let out = LexKey::prefix_end(std::hint::black_box(prefix));
             std::hint::black_box(out);
-        })
+        });
     });
 }
 
@@ -183,7 +183,7 @@ fn bench_prefix_successor(c: &mut Criterion) {
         b.iter(|| {
             let out = LexKey::prefix_successor(std::hint::black_box(prefix));
             std::hint::black_box(out);
-        })
+        });
     });
 }
 
