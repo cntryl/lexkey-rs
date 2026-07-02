@@ -1,10 +1,13 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use std::cmp::Ordering;
 use uuid::Uuid;
 
 use crate::Encodable;
 
 const SIGN_BIT: u64 = 0x8000_0000_0000_0000;
+const SIGN_BIT_8: u8 = 0x80;
+const SIGN_BIT_16: u16 = 0x8000;
+const SIGN_BIT_32: u32 = 0x8000_0000;
 
 // Small static byte buffers used to avoid allocating tiny Vecs for common single-byte
 // encodings (false/true/end-marker). Using `Bytes::from_static` avoids a heap
@@ -98,12 +101,54 @@ impl LexKey {
         Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
+    /// Encode an unsigned 8-bit integer as 1 byte.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_u8(n: u8) -> Self {
+        Self::from_bytes(Bytes::copy_from_slice(&[n]))
+    }
+
+    /// Encode an unsigned 16-bit integer as 2-byte big-endian.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_u16(n: u16) -> Self {
+        Self::from_bytes(Bytes::copy_from_slice(&n.to_be_bytes()))
+    }
+
+    /// Encode an unsigned 32-bit integer as 4-byte big-endian.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_u32(n: u32) -> Self {
+        Self::from_bytes(Bytes::copy_from_slice(&n.to_be_bytes()))
+    }
+
     /// Append the 8-byte big-endian encoding of `n` into `dst`.
     /// Returns the number of bytes written (always 8).
     #[inline(always)]
     pub fn encode_u64_into(dst: &mut Vec<u8>, n: u64) -> usize {
         dst.extend_from_slice(&n.to_be_bytes());
         8
+    }
+
+    /// Append the 1-byte encoding of `n` into `dst`.
+    #[inline(always)]
+    pub fn encode_u8_into(dst: &mut Vec<u8>, n: u8) -> usize {
+        dst.push(n);
+        1
+    }
+
+    /// Append the 2-byte big-endian encoding of `n` into `dst`.
+    #[inline(always)]
+    pub fn encode_u16_into(dst: &mut Vec<u8>, n: u16) -> usize {
+        dst.extend_from_slice(&n.to_be_bytes());
+        2
+    }
+
+    /// Append the 4-byte big-endian encoding of `n` into `dst`.
+    #[inline(always)]
+    pub fn encode_u32_into(dst: &mut Vec<u8>, n: u32) -> usize {
+        dst.extend_from_slice(&n.to_be_bytes());
+        4
     }
 
     /// Encode a signed integer so that lexicographic order matches numeric order.
@@ -117,12 +162,58 @@ impl LexKey {
         Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
+    /// Encode a signed 8-bit integer so lexicographic order matches numeric order.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_i8(n: i8) -> Self {
+        Self::from_bytes(Bytes::copy_from_slice(&[((n as u8) ^ SIGN_BIT_8)]))
+    }
+
+    /// Encode a signed 16-bit integer so lexicographic order matches numeric order.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_i16(n: i16) -> Self {
+        let transformed = (n as u16) ^ SIGN_BIT_16;
+        Self::from_bytes(Bytes::copy_from_slice(&transformed.to_be_bytes()))
+    }
+
+    /// Encode a signed 32-bit integer so lexicographic order matches numeric order.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_i32(n: i32) -> Self {
+        let transformed = (n as u32) ^ SIGN_BIT_32;
+        Self::from_bytes(Bytes::copy_from_slice(&transformed.to_be_bytes()))
+    }
+
     /// Append the transformed 8-byte encoding of an `i64` into `dst` (always 8 bytes).
     #[inline(always)]
     pub fn encode_i64_into(dst: &mut Vec<u8>, n: i64) -> usize {
         let t = (n as u64) ^ SIGN_BIT;
         dst.extend_from_slice(&t.to_be_bytes());
         8
+    }
+
+    /// Append the transformed 1-byte encoding of an `i8` into `dst`.
+    #[inline(always)]
+    pub fn encode_i8_into(dst: &mut Vec<u8>, n: i8) -> usize {
+        dst.push((n as u8) ^ SIGN_BIT_8);
+        1
+    }
+
+    /// Append the transformed 2-byte big-endian encoding of an `i16` into `dst`.
+    #[inline(always)]
+    pub fn encode_i16_into(dst: &mut Vec<u8>, n: i16) -> usize {
+        let t = (n as u16) ^ SIGN_BIT_16;
+        dst.extend_from_slice(&t.to_be_bytes());
+        2
+    }
+
+    /// Append the transformed 4-byte big-endian encoding of an `i32` into `dst`.
+    #[inline(always)]
+    pub fn encode_i32_into(dst: &mut Vec<u8>, n: i32) -> usize {
+        let t = (n as u32) ^ SIGN_BIT_32;
+        dst.extend_from_slice(&t.to_be_bytes());
+        4
     }
 
     /// Encode a boolean: `false -> 0x00`, `true -> 0x01`.
@@ -178,6 +269,27 @@ impl LexKey {
         Self::from_bytes(Bytes::copy_from_slice(&bytes))
     }
 
+    /// Encode an IEEE-754 `f32` using the same sortable transform at 4-byte width.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `x` is NaN.
+    #[inline(always)]
+    #[must_use]
+    pub fn encode_f32(x: f32) -> Self {
+        if x.is_nan() {
+            panic!("NaN is not encodable");
+        }
+
+        let b = x.to_bits();
+        let mask = ((b as i32) >> 31) as u32;
+        let neg = !b;
+        let pos = b ^ SIGN_BIT_32;
+        let transformed = (neg & mask) | (pos & !mask);
+
+        Self::from_bytes(Bytes::copy_from_slice(&transformed.to_be_bytes()))
+    }
+
     /// Append the transformed 8-byte encoding of an `f64` into `dst` (always 8 bytes).
     ///
     /// # Panics
@@ -197,6 +309,27 @@ impl LexKey {
 
         dst.extend_from_slice(&transformed.to_be_bytes());
         8
+    }
+
+    /// Append the transformed 4-byte encoding of an `f32` into `dst`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `x` is NaN.
+    #[inline(always)]
+    pub fn encode_f32_into(dst: &mut Vec<u8>, x: f32) -> usize {
+        if x.is_nan() {
+            panic!("NaN not encodable");
+        }
+
+        let b = x.to_bits();
+        let mask = ((b as i32) >> 31) as u32;
+        let neg = !b;
+        let pos = b ^ SIGN_BIT_32;
+        let transformed = (neg & mask) | (pos & !mask);
+
+        dst.extend_from_slice(&transformed.to_be_bytes());
+        4
     }
 
     /// Encode a UUID as its 16 raw RFC4122 bytes.
@@ -229,6 +362,82 @@ impl LexKey {
         }
     }
 
+    /// Return `prefix || 0xff` as an owned vector.
+    ///
+    /// This is the structured partition upper bound used by
+    /// `encode_range_upper(prefix, None)`. It is correct when all keys below
+    /// the partition continue with a separator or marker byte less than
+    /// `END_MARKER`. For arbitrary raw-byte prefix scans, use
+    /// `prefix_successor` or `prefix_scan_bounds`.
+    #[inline]
+    #[must_use]
+    pub fn prefix_end(prefix: &[u8]) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(prefix.len() + 1);
+        buf.extend_from_slice(prefix);
+        buf.push(Self::END_MARKER);
+        buf
+    }
+
+    /// Alias for `prefix_end`, named for APIs that expose range terminology.
+    #[inline]
+    #[must_use]
+    pub fn range_upper_vec(prefix: &[u8]) -> Vec<u8> {
+        Self::prefix_end(prefix)
+    }
+
+    /// Return the smallest byte string greater than all keys with `prefix`.
+    ///
+    /// This is the safe exclusive upper bound for arbitrary raw-byte prefix
+    /// scans. It increments the last non-`0xff` byte and truncates any trailing
+    /// `0xff` bytes. If no finite upper bound exists (empty prefix or all bytes
+    /// are `0xff`), returns `None` and callers should use an unbounded scan end.
+    #[inline]
+    #[must_use]
+    pub fn prefix_successor(prefix: &[u8]) -> Option<Vec<u8>> {
+        let mut upper = prefix.to_vec();
+        for index in (0..upper.len()).rev() {
+            if upper[index] != u8::MAX {
+                upper[index] += 1;
+                upper.truncate(index + 1);
+                return Some(upper);
+            }
+        }
+        None
+    }
+
+    /// Return raw-byte prefix scan bounds as `(lower, upper)`.
+    ///
+    /// `lower` is the prefix itself. `upper` is the exclusive successor from
+    /// `prefix_successor`, or `None` when the prefix has no finite successor.
+    #[inline]
+    #[must_use]
+    pub fn prefix_scan_bounds(prefix: &[u8]) -> (Vec<u8>, Option<Vec<u8>>) {
+        (prefix.to_vec(), Self::prefix_successor(prefix))
+    }
+
+    /// Return `(prefix || 0x00, prefix || 0xff)` as owned structured range bounds.
+    #[inline]
+    #[must_use]
+    pub fn prefix_range_bounds(prefix: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        let cap = prefix.len() + 1;
+        let mut lower = Vec::with_capacity(cap);
+        lower.extend_from_slice(prefix);
+        lower.push(Self::SEPARATOR);
+
+        let mut upper = Vec::with_capacity(cap);
+        upper.extend_from_slice(prefix);
+        upper.push(Self::END_MARKER);
+
+        (lower, upper)
+    }
+
+    /// Alias for `prefix_range_bounds`, named for APIs that expose range terminology.
+    #[inline]
+    #[must_use]
+    pub fn range_bounds_vec(prefix: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        Self::prefix_range_bounds(prefix)
+    }
+
     /// Create a composite key from multiple parts.
     ///
     /// Concatenate parts with a single `SEPARATOR` (0x00) between adjacent parts.
@@ -258,9 +467,10 @@ impl LexKey {
     /// ```
     #[inline]
     fn composite_capacity(parts: &[&[u8]]) -> usize {
-        parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1)
+        crate::encode_len(parts)
     }
 
+    #[inline]
     #[must_use]
     pub fn encode_composite(parts: &[&[u8]]) -> Self {
         if parts.is_empty() {
@@ -268,62 +478,45 @@ impl LexKey {
         }
 
         let cap = Self::composite_capacity(parts);
-        let mut buf = BytesMut::with_capacity(cap);
-
-        for (i, &p) in parts.iter().enumerate() {
-            if !p.is_empty() {
-                buf.extend_from_slice(p);
-            }
-            if i + 1 < parts.len() {
-                buf.put_u8(Self::SEPARATOR);
-            }
-        }
-
-        Self {
-            bytes: buf.freeze(),
-        }
+        let mut buf = Vec::with_capacity(cap);
+        crate::encode_parts_into(&mut buf, parts);
+        Self::from_bytes(buf)
     }
 
     /// Append composite parts into `dst` without a trailing separator and return bytes written.
+    #[inline]
     pub fn encode_composite_into(dst: &mut Vec<u8>, parts: &[&[u8]]) -> usize {
         if parts.is_empty() {
             return 0;
         }
 
-        let start = dst.len();
-        let additional =
-            parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
+        let additional = Self::composite_capacity(parts);
         dst.reserve(additional);
-
-        for (i, p) in parts.iter().enumerate() {
-            if !p.is_empty() {
-                dst.extend_from_slice(p);
-            }
-
-            if i + 1 < parts.len() {
-                dst.push(Self::SEPARATOR);
-            }
-        }
-
-        dst.len() - start
+        crate::encode_parts_into(dst, parts)
     }
 
     /// Build `encode_first`: `prefix + SEPARATOR` (sorts before keys that extend the same prefix).
+    #[inline]
     #[must_use]
     pub fn encode_first(parts: &[&[u8]]) -> Self {
-        let mut enc = crate::encoder::Encoder::with_capacity(crate::encode_len(parts) + 1);
-        enc.encode_composite_into_buf(parts);
-        enc.push_byte(Self::SEPARATOR);
-        Self::from_bytes(enc.freeze())
+        let mut buf = Vec::with_capacity(Self::composite_capacity(parts) + 1);
+        crate::encode_parts_into(&mut buf, parts);
+        buf.push(Self::SEPARATOR);
+        Self::from_bytes(buf)
     }
 
-    /// Build `encode_last`: `prefix + END_MARKER` (sorts after keys that extend the same prefix).
+    /// Build `encode_last`: `prefix + END_MARKER`.
+    ///
+    /// This is the structured upper bound for keys that extend the prefix via
+    /// the normal composite separator path (`prefix || 0x00 || child`). For
+    /// arbitrary raw-byte prefix scans, use `prefix_successor`.
+    #[inline]
     #[must_use]
     pub fn encode_last(parts: &[&[u8]]) -> Self {
-        let mut enc = crate::encoder::Encoder::with_capacity(crate::encode_len(parts) + 1);
-        enc.encode_composite_into_buf(parts);
-        enc.push_byte(Self::END_MARKER);
-        Self::from_bytes(enc.freeze())
+        let mut buf = Vec::with_capacity(Self::composite_capacity(parts) + 1);
+        crate::encode_parts_into(&mut buf, parts);
+        buf.push(Self::END_MARKER);
+        Self::from_bytes(buf)
     }
 
     /// Encode a range lower bound key for primary keys.
@@ -333,15 +526,20 @@ impl LexKey {
     /// - If `L` is None: `P || 00`
     ///
     /// This sorts at or before the first key in the range.
+    #[inline]
     #[must_use]
     pub fn encode_range_lower(partition: &[u8], row_lower: Option<&[u8]>) -> Self {
         if let Some(row) = row_lower {
-            Self::encode_composite(&[partition, row])
-        } else {
-            let mut buf = BytesMut::with_capacity(partition.len() + 1);
+            let mut buf = Vec::with_capacity(partition.len() + 1 + row.len());
             buf.extend_from_slice(partition);
-            buf.put_u8(Self::SEPARATOR);
-            Self::from_bytes(buf.freeze())
+            buf.push(Self::SEPARATOR);
+            buf.extend_from_slice(row);
+            Self::from_bytes(buf)
+        } else {
+            let mut buf = Vec::with_capacity(partition.len() + 1);
+            buf.extend_from_slice(partition);
+            buf.push(Self::SEPARATOR);
+            Self::from_bytes(buf)
         }
     }
 
@@ -352,20 +550,21 @@ impl LexKey {
     /// - If `U` is None: `P || ff`
     ///
     /// This sorts after the last key in the range.
+    #[inline]
     #[must_use]
     pub fn encode_range_upper(partition: &[u8], row_upper: Option<&[u8]>) -> Self {
         if let Some(row) = row_upper {
-            let mut buf = BytesMut::with_capacity(partition.len() + 1 + row.len() + 1);
+            let mut buf = Vec::with_capacity(partition.len() + 1 + row.len() + 1);
             buf.extend_from_slice(partition);
-            buf.put_u8(Self::SEPARATOR);
+            buf.push(Self::SEPARATOR);
             buf.extend_from_slice(row);
-            buf.put_u8(Self::END_MARKER);
-            Self::from_bytes(buf.freeze())
+            buf.push(Self::END_MARKER);
+            Self::from_bytes(buf)
         } else {
-            let mut buf = BytesMut::with_capacity(partition.len() + 1);
+            let mut buf = Vec::with_capacity(partition.len() + 1);
             buf.extend_from_slice(partition);
-            buf.put_u8(Self::END_MARKER);
-            Self::from_bytes(buf.freeze())
+            buf.push(Self::END_MARKER);
+            Self::from_bytes(buf)
         }
     }
 
@@ -378,12 +577,22 @@ impl LexKey {
     /// This covers all rows in the partition.
     ///
     /// For mixed-type partitions, use the `encode_range_bounds!` macro.
+    #[inline]
     #[must_use]
     pub fn encode_range_bounds(partition: &[u8]) -> (Self, Self) {
-        let lower = Self::encode_range_lower(partition, None);
-        let upper = Self::encode_range_upper(partition, None);
-        (lower, upper)
+        let cap = partition.len() + 1;
+        let mut lower = Vec::with_capacity(cap);
+        lower.extend_from_slice(partition);
+        lower.push(Self::SEPARATOR);
+
+        let mut upper = Vec::with_capacity(cap);
+        upper.extend_from_slice(partition);
+        upper.push(Self::END_MARKER);
+
+        (Self::from_bytes(lower), Self::from_bytes(upper))
     }
+
+    #[inline]
     pub fn encode_composite_encodables(parts: &[&dyn Encodable]) -> Self {
         if parts.is_empty() {
             return Self::empty();
@@ -444,142 +653,234 @@ impl From<&str> for LexKey {
     }
 }
 
+impl<T: Encodable + ?Sized> Encodable for &T {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        (**self).encoded_len()
+    }
+
+    #[inline]
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        (**self).encode_into(dst)
+    }
+}
+
 impl Encodable for &str {
+    #[inline]
     fn encoded_len(&self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         dst.extend_from_slice(self.as_bytes());
         self.len()
     }
 }
 
+impl Encodable for &[u8] {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        dst.extend_from_slice(self);
+        self.len()
+    }
+}
+
+impl<const N: usize> Encodable for &[u8; N] {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        N
+    }
+
+    #[inline]
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        dst.extend_from_slice(&self[..]);
+        N
+    }
+}
+
+impl Encodable for LexKey {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    #[inline]
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        dst.extend_from_slice(&self.bytes);
+        self.bytes.len()
+    }
+}
+
+impl Encodable for Bytes {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+        dst.extend_from_slice(self);
+        self.len()
+    }
+}
+
 impl Encodable for i64 {
+    #[inline]
     fn encoded_len(&self) -> usize {
         8
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         LexKey::encode_i64_into(dst, *self)
     }
 }
 
 impl Encodable for u64 {
+    #[inline]
     fn encoded_len(&self) -> usize {
         8
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         LexKey::encode_u64_into(dst, *self)
     }
 }
 
 impl Encodable for f64 {
+    #[inline]
     fn encoded_len(&self) -> usize {
         8
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         LexKey::encode_f64_into(dst, *self)
     }
 }
 
 impl Encodable for bool {
+    #[inline]
     fn encoded_len(&self) -> usize {
         1
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         LexKey::encode_bool_into(dst, *self)
     }
 }
 
-impl Encodable for &Uuid {
+impl Encodable for Uuid {
+    #[inline]
     fn encoded_len(&self) -> usize {
         16
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         LexKey::encode_uuid_into(dst, self)
     }
 }
 
 impl Encodable for u8 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        1
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_u64_into(dst, u64::from(*self))
+        LexKey::encode_u8_into(dst, *self)
     }
 }
 
 impl Encodable for u16 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        2
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_u64_into(dst, u64::from(*self))
+        LexKey::encode_u16_into(dst, *self)
     }
 }
 
 impl Encodable for u32 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        4
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_u64_into(dst, u64::from(*self))
+        LexKey::encode_u32_into(dst, *self)
     }
 }
 
 impl Encodable for i8 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        1
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_i64_into(dst, i64::from(*self))
+        LexKey::encode_i8_into(dst, *self)
     }
 }
 
 impl Encodable for i16 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        2
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_i64_into(dst, i64::from(*self))
+        LexKey::encode_i16_into(dst, *self)
     }
 }
 
 impl Encodable for i32 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        4
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_i64_into(dst, i64::from(*self))
+        LexKey::encode_i32_into(dst, *self)
     }
 }
 
 impl Encodable for f32 {
+    #[inline]
     fn encoded_len(&self) -> usize {
-        8
+        4
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
-        LexKey::encode_f64_into(dst, f64::from(*self))
+        LexKey::encode_f32_into(dst, *self)
     }
 }
 
 impl Encodable for String {
+    #[inline]
     fn encoded_len(&self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         let bytes = self.as_bytes();
         dst.extend_from_slice(bytes);
@@ -588,10 +889,12 @@ impl Encodable for String {
 }
 
 impl Encodable for Vec<u8> {
+    #[inline]
     fn encoded_len(&self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
         dst.extend_from_slice(self);
         self.len()
@@ -620,7 +923,7 @@ mod tests {
     }
 
     #[test]
-    fn should_widen_unsigned_to_8_bytes_when_encode_u64() {
+    fn should_encode_u64_as_8_bytes() {
         let k = LexKey::encode_u64(123);
         assert_eq!(k.to_hex_string(), "000000000000007b");
     }
@@ -645,7 +948,7 @@ mod tests {
     }
 
     #[test]
-    fn should_transform_floats_and_map_nan_to_canonical() {
+    fn should_transform_floats_and_reject_nan() {
         let p = LexKey::encode_f64(std::f64::consts::PI);
         let n = LexKey::encode_f64(-std::f64::consts::PI);
         assert!(n < p);
@@ -686,47 +989,31 @@ mod tests {
     }
 
     #[test]
-    fn should_widen_smaller_unsigned_types_to_u64() {
+    fn should_encode_narrow_unsigned_types_at_native_width() {
         // Arrange
         let u8_v: u8 = 255;
         let u16_v: u16 = 123;
         let u32_v: u32 = 123;
 
         // Act & Assert
-        assert_eq!(
-            LexKey::encode_u64(u8_v as u64).to_hex_string(),
-            LexKey::encode_u64(u8_v as u64).to_hex_string()
-        );
-        assert_eq!(
-            LexKey::encode_u64(u16_v as u64).to_hex_string(),
-            LexKey::encode_u64(u16_v as u64).to_hex_string()
-        );
-        assert_eq!(
-            LexKey::encode_u64(u32_v as u64).to_hex_string(),
-            LexKey::encode_u64(u32_v as u64).to_hex_string()
-        );
+        assert_eq!(LexKey::encode_u8(u8_v).to_hex_string(), "ff");
+        assert_eq!(LexKey::encode_u16(u16_v).to_hex_string(), "007b");
+        assert_eq!(LexKey::encode_u32(u32_v).to_hex_string(), "0000007b");
+        assert!(LexKey::encode_u8(1).as_bytes() < LexKey::encode_u8(2).as_bytes());
     }
 
     #[test]
-    fn should_widen_smaller_signed_types_to_i64() {
+    fn should_encode_narrow_signed_types_at_native_width() {
         // Arrange
         let i8_v: i8 = -100;
         let i16_v: i16 = -12345;
         let i32_v: i32 = 12345678;
 
         // Act & Assert
-        assert_eq!(
-            LexKey::encode_i64(i8_v as i64).to_hex_string(),
-            LexKey::encode_i64(i8_v as i64).to_hex_string()
-        );
-        assert_eq!(
-            LexKey::encode_i64(i16_v as i64).to_hex_string(),
-            LexKey::encode_i64(i16_v as i64).to_hex_string()
-        );
-        assert_eq!(
-            LexKey::encode_i64(i32_v as i64).to_hex_string(),
-            LexKey::encode_i64(i32_v as i64).to_hex_string()
-        );
+        assert_eq!(LexKey::encode_i8(i8_v).to_hex_string(), "1c");
+        assert_eq!(LexKey::encode_i16(i16_v).to_hex_string(), "4fc7");
+        assert_eq!(LexKey::encode_i32(i32_v).to_hex_string(), "80bc614e");
+        assert!(LexKey::encode_i8(-1).as_bytes() < LexKey::encode_i8(0).as_bytes());
     }
 
     #[test]
@@ -769,14 +1056,17 @@ mod tests {
     }
 
     #[test]
-    fn should_widen_float32_to_float64_before_encoding() {
+    fn should_encode_float32_at_native_width() {
         let v32: f32 = std::f32::consts::PI;
-        let widened = v32 as f64;
-        let from_widen = LexKey::encode_f64(widened);
-        assert_eq!(
-            from_widen.to_hex_string(),
-            LexKey::encode_f64(widened).to_hex_string()
-        );
+        assert_eq!(LexKey::encode_f32(v32).to_hex_string(), "c0490fdb");
+        assert!(LexKey::encode_f32(-1.0).as_bytes() < LexKey::encode_f32(1.0).as_bytes());
+    }
+
+    #[test]
+    fn should_order_negative_zero_before_positive_zero_for_float32() {
+        let neg_zero = LexKey::encode_f32(-0.0_f32);
+        let pos_zero = LexKey::encode_f32(0.0_f32);
+        assert!(neg_zero < pos_zero);
     }
 
     #[test]
@@ -865,27 +1155,27 @@ mod tests {
         let vec_val = vec![1, 2, 3, 4, 5];
 
         // Act & Assert
-        assert_eq!(u8_val.encoded_len(), 8);
-        assert_eq!(u16_val.encoded_len(), 8);
-        assert_eq!(u32_val.encoded_len(), 8);
-        assert_eq!(i8_val.encoded_len(), 8);
-        assert_eq!(i16_val.encoded_len(), 8);
-        assert_eq!(i32_val.encoded_len(), 8);
-        assert_eq!(f32_val.encoded_len(), 8);
+        assert_eq!(u8_val.encoded_len(), 1);
+        assert_eq!(u16_val.encoded_len(), 2);
+        assert_eq!(u32_val.encoded_len(), 4);
+        assert_eq!(i8_val.encoded_len(), 1);
+        assert_eq!(i16_val.encoded_len(), 2);
+        assert_eq!(i32_val.encoded_len(), 4);
+        assert_eq!(f32_val.encoded_len(), 4);
         assert_eq!(string_val.encoded_len(), string_val.len());
         assert_eq!(vec_val.encoded_len(), vec_val.len());
 
         let mut buf = Vec::new();
         let written = u8_val.encode_into(&mut buf);
-        assert_eq!(written, 8);
-        assert_eq!(buf.len(), 8);
+        assert_eq!(written, 1);
+        assert_eq!(buf.len(), 1);
 
-        // Check that encoding smaller types matches widening
+        // Check that encoding smaller types matches native-width constructors.
         let mut buf_u8 = Vec::new();
         u8_val.encode_into(&mut buf_u8);
-        let mut buf_u64 = Vec::new();
-        LexKey::encode_u64_into(&mut buf_u64, u8_val as u64);
-        assert_eq!(buf_u8, buf_u64);
+        let mut direct_u8 = Vec::new();
+        LexKey::encode_u8_into(&mut direct_u8, u8_val);
+        assert_eq!(buf_u8, direct_u8);
 
         // Check String and Vec<u8>
         let mut buf_str = Vec::new();
@@ -976,6 +1266,26 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn encode_f32_allocating_panics_on_nan() {
+        let _ = LexKey::encode_f32(f32::NAN);
+    }
+
+    #[test]
+    #[should_panic]
+    fn encode_f32_into_panics_on_nan() {
+        let mut buf = Vec::new();
+        let _ = LexKey::encode_f32_into(&mut buf, f32::NAN);
+    }
+
+    #[test]
+    #[should_panic]
+    fn encoder_encode_f32_into_panics_on_nan() {
+        let mut enc = Encoder::with_capacity(4);
+        let _ = enc.encode_f32_into(f32::NAN);
+    }
+
+    #[test]
     fn should_encode_composite_from_mixed_types() {
         use crate::encode_composite;
         let key = encode_composite!("hello", 42i64, true);
@@ -984,6 +1294,74 @@ mod tests {
             LexKey::encode_i64(42).as_bytes(),
             LexKey::encode_bool(true).as_bytes(),
         ]);
+        assert_eq!(key, expected);
+    }
+
+    #[test]
+    fn encode_composite_macro_should_not_move_owned_values() {
+        use crate::encode_composite;
+
+        let tenant = String::from("tenant");
+        let suffix = vec![0x01, 0x02, 0x03];
+
+        let key = encode_composite!(tenant, suffix);
+
+        assert_eq!(tenant, "tenant");
+        assert_eq!(suffix, vec![0x01, 0x02, 0x03]);
+        assert_eq!(key.as_bytes(), b"tenant\x00\x01\x02\x03");
+    }
+
+    #[test]
+    fn encode_composite_macro_should_evaluate_each_expression_once() {
+        use crate::{encode_composite, Encodable};
+        use std::cell::Cell;
+
+        struct Counted {
+            byte: u8,
+        }
+
+        impl Encodable for Counted {
+            fn encoded_len(&self) -> usize {
+                1
+            }
+
+            fn encode_into(&self, dst: &mut Vec<u8>) -> usize {
+                dst.push(self.byte);
+                1
+            }
+        }
+
+        fn counted(evaluations: &Cell<usize>, byte: u8) -> Counted {
+            evaluations.set(evaluations.get() + 1);
+            Counted { byte }
+        }
+
+        let evaluations = Cell::new(0);
+        let key = encode_composite!(counted(&evaluations, b'a'), counted(&evaluations, b'b'));
+
+        assert_eq!(evaluations.get(), 2);
+        assert_eq!(key.as_bytes(), b"a\x00b");
+    }
+
+    #[test]
+    fn should_encode_common_raw_parts_via_encodable_trait() {
+        use crate::encode_composite;
+
+        let bytes: &[u8] = b"bytes";
+        let array = b"array";
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let nested = LexKey::encode_i64(7);
+        let owned_bytes = Bytes::copy_from_slice(b"owned");
+
+        let key = encode_composite!(bytes, array, uuid, nested.clone(), owned_bytes.clone());
+        let expected = LexKey::encode_composite(&[
+            bytes,
+            &array[..],
+            uuid.as_bytes(),
+            nested.as_bytes(),
+            &owned_bytes,
+        ]);
+
         assert_eq!(key, expected);
     }
 
@@ -1025,6 +1403,66 @@ mod tests {
         let (lower, upper) = LexKey::encode_range_bounds(partition);
         assert_eq!(lower.to_hex_string(), "7061727400");
         assert_eq!(upper.to_hex_string(), "70617274ff");
+    }
+
+    #[test]
+    fn should_build_prefix_end_as_owned_vec() {
+        let prefix = b"acme\0kv\0";
+        let upper = LexKey::prefix_end(prefix);
+        let expected = LexKey::encode_range_upper(prefix, None).as_bytes().to_vec();
+
+        assert_eq!(upper, b"acme\0kv\0\xff".to_vec());
+        assert_eq!(upper, expected);
+        assert!(b"acme\0kv\0users".as_slice() < upper.as_slice());
+    }
+
+    #[test]
+    fn should_build_range_upper_vec_alias() {
+        let prefix = b"acme\0qu\0";
+        assert_eq!(LexKey::range_upper_vec(prefix), LexKey::prefix_end(prefix));
+    }
+
+    #[test]
+    fn should_build_prefix_successor_for_raw_prefix_scan() {
+        assert_eq!(LexKey::prefix_successor(b"abc"), Some(b"abd".to_vec()));
+        assert_eq!(LexKey::prefix_successor(b"ab\xff"), Some(b"ac".to_vec()));
+        assert_eq!(LexKey::prefix_successor(b"\xff"), None);
+        assert_eq!(LexKey::prefix_successor(b""), None);
+    }
+
+    #[test]
+    fn should_build_prefix_scan_bounds_for_arbitrary_bytes() {
+        let prefix = b"acme\0kv\0";
+        let (lower, upper) = LexKey::prefix_scan_bounds(prefix);
+        let upper = upper.expect("prefix should have a finite successor");
+        let child = b"acme\0kv\0\xff\x00";
+        let structured_upper = LexKey::prefix_end(prefix);
+
+        assert_eq!(lower, prefix.to_vec());
+        assert_eq!(upper, b"acme\0kv\x01".to_vec());
+        assert!(child.as_slice() < upper.as_slice());
+        assert!(child.as_slice() > structured_upper.as_slice());
+    }
+
+    #[test]
+    fn should_build_prefix_range_bounds_as_owned_vecs() {
+        let prefix = b"acme\0";
+        let (lower, upper) = LexKey::prefix_range_bounds(prefix);
+        let (expected_lower, expected_upper) = LexKey::encode_range_bounds(prefix);
+
+        assert_eq!(lower, b"acme\0\0".to_vec());
+        assert_eq!(upper, b"acme\0\xff".to_vec());
+        assert_eq!(lower, expected_lower.as_bytes());
+        assert_eq!(upper, expected_upper.as_bytes());
+    }
+
+    #[test]
+    fn should_build_range_bounds_vec_alias() {
+        let prefix = b"acme\0st\0";
+        assert_eq!(
+            LexKey::range_bounds_vec(prefix),
+            LexKey::prefix_range_bounds(prefix)
+        );
     }
 
     #[test]

@@ -34,18 +34,22 @@ assert!(!bytes.is_empty());
 ## API surface
 
 - `LexKey`
-	- Allocating encoders: `encode_string`, `encode_u64`, `encode_i64`, `encode_f64`, `encode_uuid`, `encode_bool`, `encode_end_marker`, `encode_time_unix_nanos`, `encode_composite`, `encode_first`, `encode_last`.
-  - Into-Vec encoders: `encode_u64_into`, `encode_i64_into`, `encode_f64_into`, `encode_bool_into`, `encode_uuid_into`, `encode_composite_into`.
+  - Allocating encoders: `encode_string`, `encode_u8`, `encode_u16`, `encode_u32`, `encode_u64`, `encode_i8`, `encode_i16`, `encode_i32`, `encode_i64`, `encode_f32`, `encode_f64`, `encode_uuid`, `encode_bool`, `encode_end_marker`, `encode_time_unix_nanos`, `encode_composite`, `encode_first`, `encode_last`.
+  - Into-Vec encoders: `encode_u8_into`, `encode_u16_into`, `encode_u32_into`, `encode_u64_into`, `encode_i8_into`, `encode_i16_into`, `encode_i32_into`, `encode_i64_into`, `encode_f32_into`, `encode_f64_into`, `encode_bool_into`, `encode_uuid_into`, `encode_composite_into`.
+  - Prefix/range Vec helpers: `prefix_successor`, `prefix_scan_bounds`, `prefix_end`, `range_upper_vec`, `prefix_range_bounds`, `range_bounds_vec`.
   - Accessors: `as_bytes`, `is_empty`, `to_hex_string`. Constants: `SEPARATOR=0x00`, `END_MARKER=0xFF`.
 - `Encoder`
-  - Lifecycle: `with_capacity`, `clear`, `freeze`, `as_slice`, `push_byte`.
-  - Writers: `encode_string_into`, `encode_u64_into`, `encode_i64_into`, `encode_f64_into`, `encode_uuid_into_buf`, `encode_composite_into_buf`.
+  - Lifecycle: `with_capacity`, `clear`, `freeze`, `into_vec`, `as_slice`, `push_byte`.
+  - Writers: `push_separator`, `push_end_marker`, `encode_string_into`, `encode_bytes_into`, `encode_u8_into`, `encode_u16_into`, `encode_u32_into`, `encode_u64_into`, `encode_i8_into`, `encode_i16_into`, `encode_i32_into`, `encode_i64_into`, `encode_f32_into`, `encode_f64_into`, `encode_uuid_into_buf`, `encode_composite_into_buf`.
 
 ## Performance
 
 - Reuse the same `Vec` or `Encoder` to see near zero-allocation performance. Representative times (on a typical machine):
-  - Encoder reuse: u64/i64/f64/uuid ~6–7 ns; small string ~7–8 ns; composite (3–4 parts) ~28 ns.
-  - Allocating convenience APIs are a bit slower due to buffer creation/copies.
+  - Encoder reuse: u64/i64/f64/uuid ~0.7-0.9 ns; small string ~4 ns; composite (3–4 parts) ~8.6 ns.
+  - Allocating convenience APIs: u64/i64/f64/string ~9-13 ns; composite (3 parts) ~18 ns.
+  - Reused `Vec` composite writes are ~6.9 ns for 3 parts.
+  - Owned storage-key output with `Encoder::into_vec` is ~12.2 ns for a Fitz-style `realm/domain/` prefix, versus ~24.3 ns through `freeze().to_vec()`.
+  - Structured `prefix_end` is ~12.5 ns, versus ~27 ns through `encode_range_upper(...).as_bytes().to_vec()`; arbitrary raw-prefix `prefix_successor` is ~14 ns.
 
 ## Intentional design choices (read this!)
 
@@ -53,19 +57,19 @@ This crate is for building sortable keys, not round-trip decoding. Some choices 
 
 - Separator is `0x00`: `SEPARATOR` is `0x00` and is used between composite parts. This mirrors the on-the-wire format and keeps composition simple. Don’t try to parse composites by splitting on `0x00` unless your schema dictates where to split; this crate no longer provides `encode_nil()` to avoid encouraging split-on-0x00 decoding.
 - Encode-only stance: Composite parts may contain `0x00`. That’s fine for ordering but makes generic decoding ambiguous. This crate does not ship decoders; bring your own schema if you need parsing.
-- Canonical numeric widths: Narrower numeric types are widened (signed → i64, unsigned → u64, float32 → float64) so values compare consistently across widths. Example: `u32(1)` and `u64(1)` encode identically.
-- Canonical NaN: All NaNs map to a single quiet NaN (`0x7FF8_0000_0000_0001`) to ensure deterministic ordering.
+- Typed numeric widths: `Encodable` and `encode_composite!` preserve the Rust type width (`u8` → 1 byte, `u16` → 2, `u32`/`f32` → 4, `u64`/`i64`/`f64` → 8). This keeps typed product keys compact. Use explicit 64-bit values when cross-width canonicalization is required.
 - NaN handling: NaN values are not encodable and will cause a panic. Use a schema-level presence/marker value to represent missing or invalid floats.
-- No trailing separator: `encode_composite` inserts one `0x00` between adjacent parts but nothing after the last. Use `encode_first`/`encode_last` to build prefix bounds.
-- First/last markers: `encode_first` appends `SEPARATOR (0x00)` and `encode_last` appends `END_MARKER (0xFF)` to a prefix to construct range bounds that sort before/after any extension of that prefix.
-- Safety over micro-optimizations: As of 2025-10-13, allocating and into-Vec paths use safe copies (`Bytes::copy_from_slice`, `Vec::extend_from_slice`). The reusable `Encoder` already uses safe `BytesMut + BufMut` writes.
+- No trailing separator: `encode_composite` inserts one `0x00` between each adjacent pair of parts but nothing after the last. Empty parts are preserved, so adjacent separators are possible. Use `encode_first`/`encode_last` to build prefix bounds.
+- First/last markers: `encode_first` appends `SEPARATOR (0x00)` and `encode_last` appends `END_MARKER (0xFF)` to a prefix to construct structured composite range bounds.
+- Prefix bounds: use `prefix_successor`/`prefix_scan_bounds` for arbitrary raw-byte prefix scans. Use `prefix_end`/`range_upper_vec` only for structured LexKey partition ranges where child keys continue below `0xFF`.
+- Safety over micro-optimizations: Allocating and into-Vec paths use safe copies (`Bytes::copy_from_slice`, `Vec::extend_from_slice`). The reusable `Encoder` uses a `Vec<u8>` internally and freezes it into `Bytes` without copying the encoded payload.
+- Owned storage keys: if the caller ultimately needs `Vec<u8>`, use `Encoder::into_vec` and the Vec-returning range helpers to avoid `Bytes` roundtrips.
 
 ## Safety & implementation notes
 
-- Allocating and into-Vec encoders use safe copy APIs. The `Encoder` uses `bytes::BytesMut` and `BufMut` for efficient writes without `unsafe`.
-- Tests cover edge cases (i64 min/max, ±0, infinities, NaN) and composites; coverage is 100% across library sources.
+- Allocating and into-Vec encoders use safe copy APIs. The `Encoder` uses `Vec<u8>` writes and returns immutable `Bytes` without `unsafe`.
+- Tests cover edge cases (narrow and 64-bit numerics, ±0, infinities, NaN, composites, macro evaluation, and range bounds).
 
 ## License
 
 MIT
-
