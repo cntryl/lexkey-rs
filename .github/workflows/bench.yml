@@ -11,6 +11,8 @@ jobs:
   bench:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      STRESS_MICRO_SAMPLE_DURATION_MS: 100
 
     steps:
       - name: Checkout
@@ -20,15 +22,15 @@ jobs:
         run: cargo bench --no-run
 
       - name: Run LexKey Benchmarks
-        run: cargo bench --bench lexkey -- --noplot
+        run: cargo bench --bench lexkey -- --profile release --samples 20 --warmup-samples 3
 
       - name: Run Encoder Benchmarks
-        run: cargo bench --bench encoder -- --noplot
+        run: cargo bench --bench encoder -- --profile release --samples 20 --warmup-samples 3
 
       - name: Upload Benchmark Results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: criterion-results
-          path: target/criterion
+          name: cntryl-stress-results
+          path: target/stress
           retention-days: 30

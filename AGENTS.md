@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Rust library crate published as `lexkey`. Core source lives in `src/`: `lib.rs` defines the public crate surface, macros, and shared helpers; `lexkey.rs` contains the allocating `LexKey` API; `encoder.rs` contains the reusable buffer-oriented `Encoder`. Unit tests are colocated in the source modules under `#[cfg(test)]`, and rustdoc examples act as doc-tests. Criterion benchmarks live in `benches/`, with shared benchmark configuration in `benches/common.rs`. `docs/SPEC.md` documents encoding behavior; keep behavior changes aligned with that spec and `README.md`.
+This is a Rust library crate published as `lexkey`. Core source lives in `src/`: `lib.rs` defines the public crate surface, macros, and shared helpers; `lexkey.rs` contains the allocating `LexKey` API; `encoder.rs` contains the reusable buffer-oriented `Encoder`. Unit tests are colocated in the source modules under `#[cfg(test)]`, and rustdoc examples act as doc-tests. `cntryl-stress` benchmarks live in `benches/`. `docs/SPEC.md` documents encoding behavior; keep behavior changes aligned with that spec and `README.md`.
 
 ## Build, Test, and Development Commands
 
@@ -10,7 +10,8 @@ This is a Rust library crate published as `lexkey`. Core source lives in `src/`:
 - `cargo test` runs unit tests and doc-tests.
 - `cargo fmt --check` verifies rustfmt formatting; run `cargo fmt` to apply it.
 - `cargo clippy --all-targets -- -D warnings -W clippy::pedantic` enforces lint cleanliness for library, tests, and benches.
-- `cargo bench --bench lexkey` and `cargo bench --bench encoder` run the Criterion benchmark suites.
+- `cargo bench --bench lexkey` and `cargo bench --bench encoder` run the `cntryl-stress` benchmark suites.
+- Use `STRESS_MICRO_SAMPLE_DURATION_MS=100 cargo bench --bench <suite> -- --profile release --samples 20 --warmup-samples 3` for release-quality evidence.
 
 ## Coding Style & Naming Conventions
 
