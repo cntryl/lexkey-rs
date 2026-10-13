@@ -20,7 +20,7 @@ hex = "0.4"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-cntryl-stress = "0.4"
+cntryl-stress = "0.5"
 
 [[bench]]
 name = "lexkey"
