@@ -6,7 +6,6 @@ license-file = "LICENSE"
 readme = "README.md"
 description = "Lexicographically-sortable binary key encodings for numbers, strings, UUIDs and composites."
 repository = "https://github.com/cntryl/lexkey-rs"
-homepage = "https://github.com/cntryl/lexkey-rs"
 keywords = ["lexicographic", "encoding", "keys", "uuid", "sortable"]
 categories = ["encoding", "database"]
 [lib]
@@ -14,13 +13,12 @@ name = "lexkey"
 path = "src/lib.rs"
 
 [dependencies]
-# Add your dependencies here
 bytes = "1"
 hex = "0.4"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-cntryl-stress = "0.4"
+cntryl-stress = "0.5"
 
 [[bench]]
 name = "lexkey"
