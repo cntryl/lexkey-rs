@@ -1189,9 +1189,9 @@ mod tests {
     fn should_clear_encoder_and_expose_as_slice() {
         let mut enc = Encoder::with_capacity(16);
         enc.encode_string_into("abc");
-        assert!(!enc.as_slice().is_empty());
+        assert_ne!(enc.as_slice(), []);
         enc.clear();
-        assert!(enc.as_slice().is_empty());
+        assert_eq!(enc.as_slice(), []);
     }
 
     #[test]
